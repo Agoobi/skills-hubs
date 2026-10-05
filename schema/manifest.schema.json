@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Agoobi/skills-hubs/schema/manifest.schema.json",
+  "title": "Agoobi Skills Hub manifest",
+  "type": "object",
+  "required": ["version", "name", "categories", "skills"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "icon"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "label": { "type": "string", "minLength": 1 },
+          "icon": { "$ref": "#/$defs/id" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skill" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]{2,64}$" },
+    "skill": {
+      "type": "object",
+      "required": ["id", "path", "name", "summary", "category", "icon", "tags", "version", "agents", "requires", "featured"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "path": { "type": "string", "pattern": "^skills/[a-z0-9-]{2,64}$" },
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "category": { "$ref": "#/$defs/id" },
+        "icon": { "$ref": "#/$defs/id" },
+        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+        "agents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" }, "uniqueItems": true },
+        "requires": {
+          "type": "object",
+          "properties": {
+            "toolsets": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "env": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+          },
+          "additionalProperties": true
+        },
+        "featured": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
