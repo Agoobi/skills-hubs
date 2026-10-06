@@ -57,7 +57,7 @@
       "category": "marketing",
       "icon": "facebook",
       "tags": ["fanpage", "facebook", "zernio"],
-      "version": "0.1.1",
+      "version": "0.2.0",
       "agents": ["hermes"],
       "requires": { "toolsets": ["web", "terminal"], "env": ["ZERNIO_API_KEY"] },
       "featured": true

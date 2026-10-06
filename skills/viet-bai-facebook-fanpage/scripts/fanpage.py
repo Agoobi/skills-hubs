@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cong cu cho skill viet-bai-facebook-fanpage. Chi dung thu vien chuan.
 
-Lenh: pages | sync-accounts | search-images | download | upload | draft | schedule | status
+Lenh: pages | sync-accounts | search-images | download | upload | check | validate | draft | update | schedule | status
 KHONG co lenh publish ngay: bai luon dung o draft (hoac scheduled khi user da duyet ro rang).
 Ket qua in ra JSON de agent doc.
 """
@@ -244,6 +244,46 @@ def cmd_check(a):
     out({"usage": zapi(cfg, "GET", "/usage-stats"), "health": zapi(cfg, "GET", "/accounts/health")})
 
 
+def cmd_update(a):
+    """Sua draft da tao (noi dung, anh, first comment). Chi ap dung cho post dang o trang thai draft."""
+    if not (a.content_file or a.media is not None or a.first_comment is not None):
+        die("Khong co gi de cap nhat: can --content-file, --media hoac --first-comment.")
+    cfg = load()
+    cur = zapi(cfg, "GET", f"/posts/{a.post_id}")
+    cur = cur.get("post", cur)
+    if cur.get("status") != "draft":
+        die(f"Tu choi: post {a.post_id} dang o trang thai '{cur.get('status')}', chi duoc sua draft.")
+    # isDraft: true giu post o trang thai draft; khong bao gio gui scheduledFor/publishNow
+    body = {"isDraft": True}
+    if a.content_file:
+        content = Path(a.content_file).read_text(encoding="utf-8").strip()
+        if not content:
+            die("Noi dung bai rong.")
+        body["content"] = content
+    if a.media is not None:  # --media khong kem gia tri = xoa het anh
+        body["mediaItems"] = [upload(cfg, m) if Path(m).exists() else {"type": "image", "url": m} for m in a.media]
+    if a.first_comment is not None:  # --first-comment "" = xoa comment
+        platforms = []
+        for p in cur.get("platforms", []):
+            acc = p.get("accountId")
+            psd = dict(p.get("platformSpecificData") or {})
+            if p.get("platform") == "facebook":
+                if a.first_comment:
+                    psd["firstComment"] = a.first_comment
+                else:
+                    psd.pop("firstComment", None)
+            platforms.append({"platform": p.get("platform"), "accountId": acc.get("_id") if isinstance(acc, dict) else acc,
+                              **({"platformSpecificData": psd} if psd else {})})
+        body["platforms"] = platforms
+    res = zapi(cfg, "PUT", f"/posts/{a.post_id}", body)
+    p = res.get("post", res)
+    if p.get("status") != "draft":
+        die(f"Canh bao: sau khi cap nhat post o trang thai '{p.get('status')}', kiem tra ngay tren Zernio.")
+    out({"ok": True, "post_id": a.post_id, "status": p.get("status"), "post_url": post_url(cfg, a.post_id),
+         "updated": [k for k in ("content", "mediaItems", "platforms") if k in body],
+         "note": "Draft da duoc cap nhat tai cho, khong tao post moi."})
+
+
 def cmd_status(a):
     cfg = load()
     out({"post_url": post_url(cfg, a.post_id), **zapi(cfg, "GET", f"/posts/{a.post_id}")})
@@ -282,6 +322,12 @@ def main():
             s.add_argument("--timezone")
             s.add_argument("--i-have-user-approval", action="store_true")
         s.set_defaults(f=f)
+    s = sp.add_parser("update", help="Sua draft da tao, giu nguyen trang thai draft")
+    s.add_argument("post_id")
+    s.add_argument("--content-file")
+    s.add_argument("--media", nargs="*", help="Thay toan bo anh; de trong de xoa anh")
+    s.add_argument("--first-comment", help='Dat first comment; "" de xoa')
+    s.set_defaults(f=cmd_update)
     s = sp.add_parser("status")
     s.add_argument("post_id")
     s.set_defaults(f=cmd_status)

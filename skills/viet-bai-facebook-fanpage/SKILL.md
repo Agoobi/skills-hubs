@@ -1,7 +1,7 @@
 ---
 name: viet-bai-facebook-fanpage
 description: Viết bài fanpage, tạo draft trên Zernio để duyệt tay.
-version: 0.1.1
+version: 0.2.0
 author: Agoobi
 license: MIT
 metadata:
@@ -51,7 +51,7 @@ Yêu cầu user xác nhận ảnh cuối cùng.
 
 **Gate 4 — Bản nháp.** Viết 1-2 phương án theo `brand_voice`, `audience`, `default_cta`, `hashtags`, `avoid` của page (xem `references/viet-bai.md`). Hiển thị nguyên văn. Hỏi: sửa gì? chọn phương án nào? Lặp đến khi user nói "ok".
 
-**Gate 5 — Comment đầu tiên (first comment).** Hỏi có muốn comment đầu bài không (link, ghi chú giá, credit ảnh, hashtag đẩy xuống comment...). Soạn nếu cần, user duyệt. Comment được lưu vào draft (`platformSpecificData.firstComment`) và Zernio đăng nó khi user publish; vẫn đưa text comment trong tin bàn giao để user kiểm tra.
+**Gate 5 — Comment đầu tiên (first comment).** Hỏi có muốn comment đầu bài không (link, ghi chú giá, credit ảnh, hashtag đẩy xuống comment...). Soạn nếu cần, user duyệt. Comment được lưu vào draft (`platformSpecificData.firstComment`) và Zernio đăng nó khi user publish; vẫn đưa text comment trong tin bàn giao để user kiểm tra. Nếu user chưa quyết, vẫn tạo draft được: thêm comment sau bằng `update`.
 
 **Gate 6 — Lịch.** Hỏi thời điểm đăng: gợi ý từ `best_times` của page, múi giờ của page. Ghi lại giờ dự kiến. Mặc định: **chỉ tạo draft**, user tự lên lịch/publish trên Zernio.
 
@@ -66,6 +66,18 @@ python -I scripts/fanpage.py draft --page <alias> --content-file <file.txt> --me
 Lệnh tự upload ảnh local (`/media/presign`) và tạo post `isDraft: true` (theo docs Zernio, `isDraft` thắng `publishNow`/`scheduledFor`: bài chỉ được lưu, không bao giờ đăng). Có `Idempotency-Key` nên không tạo trùng khi retry. Gửi user: **link bài trên Zernio** (`post_url` trong kết quả, dạng `https://zernio.com/dashboard/posts-all?post=<post_id>`), trạng thái `draft`, giờ dự kiến, text first comment. Nhắc: "Bạn mở Zernio, kiểm tra và bấm Publish/Schedule bằng tay." Nếu user ở Gate 6-7 nói rõ "lên lịch giúp luôn" thì mới dùng `schedule --time ... --i-have-user-approval` (đúng timezone page) và nói rõ bài sẽ tự đăng lúc đó. Zernio đăng NGAY nếu giờ đã qua, nên script từ chối mọi giờ không cách hiện tại ít nhất 5 phút.
 
 Kiểm tra lại: `status <post_id>`.
+
+## Sửa draft đã tạo
+
+Khi user muốn đổi gì sau khi đã có draft (sửa câu chữ, thêm/đổi first comment, thay ảnh), **sửa tại chỗ, không tạo draft mới**:
+
+```
+python -I scripts/fanpage.py update <post_id> [--content-file <file.txt>] [--media <file hoặc url>...] [--first-comment "<text>"]
+```
+
+- Chỉ gửi phần thay đổi. `--media` thay toàn bộ ảnh (`--media` không kèm gì = xóa ảnh); `--first-comment ""` = xóa comment.
+- Chỉ áp dụng cho post đang `draft`; post đã lên lịch/đã đăng thì script từ chối → hướng dẫn user sửa trên Zernio.
+- Luôn gửi `isDraft: true` và không gửi giờ đăng, nên bài vẫn là draft. Vẫn hiển thị bản sửa cho user duyệt trước khi chạy, rồi gửi lại `post_url`.
 
 ## Xử lý lỗi
 
