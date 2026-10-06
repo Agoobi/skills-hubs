@@ -1,0 +1,32 @@
+{
+  "zernio": {
+    "api_key": "sk_DAN_KEY_ZERNIO_VAO_DAY",
+    "base_url": "https://zernio.com/api/v1",
+    "dashboard_url": "https://zernio.com/dashboard"
+  },
+  "default_page": "shop-chinh",
+  "pages": {
+    "shop-chinh": {
+      "label": "Fanpage Shop Chính",
+      "account_id": "ZERNIO_ACCOUNT_ID_CUA_PAGE",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "brand_voice": "Thân thiện, gần gũi, xưng 'mình/bạn', ít emoji, câu ngắn.",
+      "audience": "Khách hàng cá nhân 25-40 tuổi",
+      "default_cta": "Inbox page để được tư vấn nhé!",
+      "hashtags": ["#shopchinh"],
+      "avoid": ["cam kết 100%", "số một thị trường"],
+      "best_times": ["11:30", "20:00"]
+    },
+    "page-thu-hai": {
+      "label": "Fanpage Thứ Hai",
+      "account_id": "ZERNIO_ACCOUNT_ID_PAGE_2",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "brand_voice": "Chuyên nghiệp, số liệu rõ ràng.",
+      "audience": "Doanh nghiệp nhỏ",
+      "default_cta": "Đặt lịch demo qua link bio.",
+      "hashtags": [],
+      "avoid": [],
+      "best_times": ["09:00"]
+    }
+  }
+}

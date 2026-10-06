@@ -50,6 +50,19 @@
       "featured": true
     },
     {
+      "id": "viet-bai-facebook-fanpage",
+      "path": "skills/viet-bai-facebook-fanpage",
+      "name": "Bot Viết bài Fanpage",
+      "summary": "Viết bài nhiều bước duyệt, tạo draft Zernio, quản lý nhiều page",
+      "category": "marketing",
+      "icon": "facebook",
+      "tags": ["fanpage", "facebook", "zernio"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["web", "terminal"], "env": ["ZERNIO_API_KEY"] },
+      "featured": true
+    },
+    {
       "id": "quang-cao",
       "path": "skills/quang-cao",
       "name": "Bot Quảng cáo",
