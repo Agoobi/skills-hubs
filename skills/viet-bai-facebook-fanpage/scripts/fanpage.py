@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 SKILL = Path(__file__).resolve().parents[1]
 SETTINGS = SKILL / "settings.json"
 UA = "agoobi-fanpage-skill/0.1 (https://github.com/Agoobi/skills-hubs)"
+POST_URL = "https://zernio.com/dashboard/posts-all?post={post_id}"
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -42,7 +43,7 @@ def zcfg(cfg):
     key = os.environ.get("ZERNIO_API_KEY") or z.get("api_key", "")
     if not key.startswith("sk_") or "DAN_KEY" in key:
         die("Thieu API key Zernio hop le (sk_...). Dien vao settings.json > zernio.api_key hoac env ZERNIO_API_KEY.")
-    return key, z.get("base_url", "https://zernio.com/api/v1").rstrip("/"), z.get("dashboard_url", "https://zernio.com/dashboard")
+    return key, z.get("base_url", "https://zernio.com/api/v1").rstrip("/"), z.get("post_url_template", POST_URL)
 
 
 def http(method, url, headers=None, body=None, raw=False):
@@ -186,11 +187,15 @@ def build_post(cfg, a, state):
     return alias, body
 
 
+def post_url(cfg, post_id):
+    return zcfg(cfg)[2].replace("{post_id}", str(post_id))
+
+
 def finish(cfg, alias, post, extra=None):
-    _, _, dash = zcfg(cfg)
     p = post.get("post", post)
-    out({"ok": True, "page": alias, "post_id": p.get("_id"), "status": p.get("status"), "dashboard": dash,
-         "note": "Mo dashboard Zernio > Posts, tim post_id nay de duyet/Publish bang tay.", **(extra or {})})
+    out({"ok": True, "page": alias, "post_id": p.get("_id"), "status": p.get("status"),
+         "post_url": post_url(cfg, p.get("_id")),
+         "note": "Gui post_url cho user de mo bai tren Zernio, kiem tra va Publish bang tay.", **(extra or {})})
 
 
 def create_post(cfg, body):
@@ -240,7 +245,8 @@ def cmd_check(a):
 
 
 def cmd_status(a):
-    out(zapi(load(), "GET", f"/posts/{a.post_id}"))
+    cfg = load()
+    out({"post_url": post_url(cfg, a.post_id), **zapi(cfg, "GET", f"/posts/{a.post_id}")})
 
 
 def main():

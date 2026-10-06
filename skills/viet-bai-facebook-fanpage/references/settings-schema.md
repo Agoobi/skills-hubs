@@ -4,7 +4,7 @@
 |---|---|
 | `zernio.api_key` | Key `sk_...` từ Zernio. Biến môi trường `ZERNIO_API_KEY` ưu tiên hơn. |
 | `zernio.base_url` | Mặc định `https://zernio.com/api/v1`. |
-| `zernio.dashboard_url` | Link gửi user để duyệt draft (mặc định `https://zernio.com/dashboard`). Nếu bạn biết deep-link tới post, đổi tại đây. |
+| `zernio.post_url_template` | Mẫu link mở bài trên Zernio, `{post_id}` được thay bằng ID post (mặc định `https://zernio.com/dashboard/posts-all?post={post_id}`). |
 | `default_page` | Alias page dùng khi user không chỉ định. |
 | `pages.<alias>.account_id` | ID tài khoản Facebook Page trong Zernio (lấy bằng `sync-accounts`). |
 | `pages.<alias>.timezone` | Múi giờ IANA cho lịch. |
