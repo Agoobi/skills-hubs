@@ -2,7 +2,7 @@
   "zernio": {
     "api_key": "sk_DAN_KEY_ZERNIO_VAO_DAY",
     "base_url": "https://zernio.com/api/v1",
-    "dashboard_url": "https://zernio.com/dashboard"
+    "post_url_template": "https://zernio.com/dashboard/posts-all?post={post_id}"
   },
   "default_page": "shop-chinh",
   "pages": {
