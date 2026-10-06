@@ -14,6 +14,6 @@
 
 Thêm page: kết nối trong Zernio → `python -I scripts/fanpage.py sync-accounts --write` → chỉnh các trường giọng văn.
 
-API Zernio dùng: `GET /v1/accounts`, `GET /v1/accounts/health`, `GET /v1/usage-stats`, `POST /v1/media/presign` (+ PUT lên `uploadUrl`, dùng `publicUrl`), `POST /v1/tools/validate/post` (dry-run), `POST /v1/posts` (`isDraft: true` hoặc `scheduledFor` + `timezone`, header `Idempotency-Key`), `GET /v1/posts/{id}`.
+API Zernio dùng: `GET /v1/accounts`, `GET /v1/accounts/health`, `GET /v1/usage-stats`, `POST /v1/media/presign` (+ PUT lên `uploadUrl`, dùng `publicUrl`), `POST /v1/tools/validate/post` (dry-run), `POST /v1/posts` (`isDraft: true` hoặc `scheduledFor` + `timezone`, header `Idempotency-Key`), `GET /v1/posts/{id}`, `PUT /v1/posts/{id}` (lệnh `update`, luôn kèm `isDraft: true`).
 
 Lưu ý từ docs: `isDraft: true` thắng `publishNow` và `scheduledFor`; `scheduledFor` ở quá khứ sẽ bị đăng ngay; chuỗi giờ không có `Z`/offset được hiểu theo `timezone`.
