@@ -85,7 +85,7 @@ Chạy `npx hyperframes check` tới khi sạch lỗi. Chụp ảnh tĩnh ở gi
 **Cổng 9 — Kiểm cuối và xuất.**
 Chạy danh sách kiểm ở cuối `references/edit-tokens.md` và báo kết quả từng mục. Người dùng đồng ý thì `npx hyperframes render`, xuất ra đúng đường dẫn `output` ghi trong `project.json` (`output/<tên-video>.mp4`). Xem lại file mp4: khung đầu, khung cuối, một khung giữa mỗi chương, và nghe đoạn đầu.
 
-Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `output/metadata.json` với một khối cho mỗi nền tảng của kênh. Điền tiêu đề, mô tả, caption, hashtag theo `references/metadata.md`, rồi `metadata check --project <dự án>` tới khi không còn mục nào trong `problems`. Đưa người dùng xem nội dung đã điền.
+Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `output/metadata.json` với một khối cho mỗi nền tảng của kênh. Điền tiêu đề, mô tả, caption, hashtag theo `references/metadata.md` (TikTok cần mô tả dài, không chỉ một câu), rồi `metadata check --project <dự án>` tới khi không còn mục nào trong `problems`. Đưa người dùng xem nội dung đã điền.
 
 Cuối cùng làm ảnh bìa: đọc `references/thumbnail.md`, đề xuất 2 ý (nhóm hình trên, nhóm hình dưới, chữ tối đa 4 từ) cho người dùng chọn, rồi chạy `thumbnail --project <dự án> --variants 2 --title "..." --scene "..."`. Tự mở từng ảnh ra kiểm chữ và linh vật trước khi gửi; bản người dùng chọn lưu thành `output/thumbnail.png`.
 

@@ -230,8 +230,8 @@ def cmd_init(args: argparse.Namespace) -> None:
 LIMITS = {
     "youtube": {"title": 100, "description": 5000, "tags_total": 500},
     "youtube-shorts": {"title": 100, "description": 5000},
-    "tiktok": {"caption": 2200, "hashtags": 5},
-    "reels": {"caption": 2200, "hashtags": 5},
+    "tiktok": {"caption": 150, "description": 3500, "post_text": 4000, "description_min": 400, "hashtags": 5},
+    "reels": {"caption": 150, "description": 1900, "post_text": 2200, "hashtags": 5},
     "facebook": {"caption": 2200},
 }
 
@@ -277,7 +277,8 @@ def platform_block(platform: str, project: dict, cfg: dict, chapters: list[dict]
         return {"title": "", "description": "", "hashtags": ["#shorts"], "visibility": "private",
                 "made_for_kids": False}
     if platform in ("tiktok", "reels"):
-        return {"caption": "", "hashtags": [], "cover_time": 0.0}
+        # caption opens the post, description is the long body; `check` joins them into post_text.
+        return {"caption": "", "description": "", "hashtags": [], "post_text": "", "cover_time": 0.0}
     return {"caption": ""}
 
 
@@ -348,6 +349,16 @@ def cmd_metadata(args: argparse.Namespace) -> None:
                 for word in avoid:
                     if word and word in value.lower():
                         problems.append(f"{platform}.{field} chứa cụm cần tránh của kênh: '{word}'.")
+        if "post_text" in limits:
+            body = block.get("description", "").strip()
+            if len(body) < limits.get("description_min", 0):
+                problems.append(f"{platform}.description dài {len(body)} ký tự, cần ít nhất {limits['description_min']} "
+                                "(mô tả dài giúp video được tìm thấy; xem metadata.md).")
+            # The single text a person pastes into the platform's description box.
+            block["post_text"] = "\n\n".join(part for part in (block.get("caption", "").strip(), body,
+                                                              " ".join(block.get("hashtags", []))) if part)
+            if len(block["post_text"]) > limits["post_text"]:
+                problems.append(f"{platform}.post_text dài {len(block['post_text'])} ký tự, giới hạn {limits['post_text']}.")
         if "tags" in block and len(",".join(block["tags"])) > limits.get("tags_total", 10 ** 9):
             problems.append(f"{platform}.tags vượt {limits['tags_total']} ký tự.")
         if "hashtags" in block:

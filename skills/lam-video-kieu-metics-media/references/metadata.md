@@ -27,8 +27,10 @@ Kiểm tra: `python -I scripts/video.py metadata check --project <dự án>`.
   },
   "platforms": {
     "tiktok": {
-      "caption": "Web dựng bằng AI có thể đang cộng tiền hai lần cho một lần chuyển khoản. Cách kiểm tra trong 30 giây.",
+      "caption": "Web dựng bằng AI có thể đang cộng tiền hai lần cho một lần chuyển khoản.",
+      "description": "Vì sao lại thế: ...\n\nCách kiểm tra: ...\n\nCách sửa: ...",
       "hashtags": ["#vibecode", "#sepay", "#laptrinhweb"],
+      "post_text": "(check tự ghép: caption + description + hashtags, dán thẳng vào ô Mô tả)",
       "cover_time": 1.2
     },
     "youtube-shorts": {
@@ -73,8 +75,18 @@ Kiểm tra: `python -I scripts/video.py metadata check --project <dự án>`.
 
 Khi dán mô tả lên YouTube, chèn danh sách chương thành các dòng `0:00 Tiêu đề`.
 
-**Caption TikTok / Reels**
-- 1–2 câu: câu đầu lặp lại hook, câu sau nói người xem nhận được gì.
+**Mô tả TikTok / Reels**
+
+Ô "Mô tả" của TikTok nhận tới 4000 ký tự và chính TikTok ghi ngay trong ô đó rằng mô tả dài có thể tăng lượt xem trung bình. Mô tả cũng là chữ để người ta tìm ra video, nên không dừng ở một câu. Ba trường, `check` ghép lại thành `post_text` để dán một lần:
+
+- `caption` (tối đa 150 ký tự): dòng mở, lặp lại hook. Đây là phần hiện ra trước khi bấm "xem thêm".
+- `description` (TikTok: 400–3500 ký tự; Reels: tối đa 1900): phần thân, viết thành các đoạn ngắn cách nhau một dòng trống, theo thứ tự:
+  1. Vấn đề bằng lời người xem sẽ gõ tìm ("shop bị cộng tiền hai lần", "webhook SePay gọi lại").
+  2. Vì sao xảy ra, 2–4 câu, đúng nội dung video và `research.md`.
+  3. Cách kiểm tra hoặc cách sửa, đánh số từng bước.
+  4. Một câu hỏi mời bình luận, lấy từ video.
+  5. Câu kêu gọi của kênh.
+  Không nhồi từ khoá, không lặp nguyên văn lời đọc, không thêm thông tin video không nói. Số liệu và tên nút phải có trong `research.md`. Link không bấm được trên TikTok nên chỉ ghi tên trang ("tài liệu webhook của SePay").
 - 3–5 hashtag: 1 thẻ chủ đề rộng, 2–3 thẻ ngách, tuỳ chọn 1 thẻ của kênh. Mỗi thẻ viết liền, bắt đầu bằng `#`.
 - `cover_time`: giây trong video có khung hình rõ nhất làm ảnh bìa (thường là khung kết quả ở hook).
 
@@ -90,7 +102,8 @@ Khi dán mô tả lên YouTube, chèn danh sách chương thành các dòng `0:0
 |---|---|
 | `youtube` | tiêu đề ≤ 100 ký tự và không trống; mô tả ≤ 5000; tags ≤ 500 ký tự; chương bắt đầu 0:00, ≥ 3 mốc, đủ tiêu đề |
 | `youtube-shorts` | tiêu đề ≤ 100 và không trống; mô tả ≤ 5000 |
-| `tiktok`, `reels` | caption ≤ 2200 và không trống; ≤ 5 hashtag, đúng dạng `#the` |
+| `tiktok` | caption ≤ 150 và không trống; description 400–3500 ký tự; `post_text` (tự ghép) ≤ 4000; ≤ 5 hashtag, đúng dạng `#the` |
+| `reels` | caption ≤ 150 và không trống; description ≤ 1900; `post_text` ≤ 2200; ≤ 5 hashtag |
 | mọi nền tảng | không chứa cụm trong `avoid` của kênh; file mp4 có trong `output/` và đúng kích thước định dạng |
 
 Các con số là mức an toàn; nền tảng có thể cho phép nhiều hơn.
