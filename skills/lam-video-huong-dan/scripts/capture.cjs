@@ -7,6 +7,9 @@
  *
  * Writes <name>.mp4 (or .webm when ffmpeg is missing), <name>.log.json with the
  * time and cursor position of every step, and any stills requested with "shot".
+ * Steps wrapped in {"do":"scene","id":...,"duration":...} ... {"do":"end"} are
+ * padded to that duration and cut out as <id>.mp4, so a clip can be recorded to
+ * the exact length of its narration.
  * Needs the `playwright` package; set PLAYWRIGHT_MODULE to its folder if it is
  * not resolvable from the current directory.
  */
@@ -85,10 +88,14 @@ async function record(playwright, args) {
   const rawDir = path.join(outDir, `.raw-${name}`);
   fs.mkdirSync(rawDir, { recursive: true });
 
+  // A smaller viewport makes page content larger in the frame. Playwright records
+  // in CSS pixels, so the recording is made at the viewport size and scaled up to
+  // the output format afterwards; expect it slightly softer than a native capture.
+  const viewport = plan.viewport || format;
   const contextOptions = {
-    viewport: format,
+    viewport,
     deviceScaleFactor: 1,
-    recordVideo: { dir: rawDir, size: format },
+    recordVideo: { dir: rawDir, size: viewport },
     colorScheme: plan.colorScheme || "light",
     locale: plan.locale || "vi-VN",
     ...(args.format === "short" || plan.format === "short" ? { isMobile: true, hasTouch: false } : {}),
@@ -105,8 +112,9 @@ async function record(playwright, args) {
   const page = context.pages()[0] || (await context.newPage());
   const started = Date.now();
   const now = () => Math.round((Date.now() - started) / 10) / 100;
-  const log = { name, format: args.format || plan.format || "long", ...format, steps: [], marks: [], shots: [] };
-  let mouse = { x: format.width / 2, y: format.height / 2 };
+  const log = { name, format: args.format || plan.format || "long", ...format, viewport, scale: format.width / viewport.width, steps: [], marks: [], shots: [], scenes: [] };
+  let mouse = { x: viewport.width / 2, y: viewport.height / 2 };
+  let scene = null;
   await page.mouse.move(mouse.x, mouse.y);
   // A new document starts with the pointer overlay parked off-screen; nudge it back into place.
   page.on("load", () => {
@@ -120,6 +128,21 @@ async function record(playwright, args) {
     const box = await locator.boundingBox();
     if (!box) throw new Error(`Không thấy phần tử: ${selector}`);
     return { locator, box, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  // Scroll by `total` pixels over `ms` of real time, easing in and out. Driven by the
+  // clock rather than a frame count, because each wheel event takes a variable time.
+  const smoothWheel = async (total, ms) => {
+    const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const begin = Date.now();
+    let done = 0;
+    while (true) {
+      const progress = Math.min(1, (Date.now() - begin) / ms);
+      const target = total * ease(progress);
+      await page.mouse.wheel(0, target - done);
+      done = target;
+      if (progress >= 1) break;
+      await page.waitForTimeout(12);
+    }
   };
   const glide = async (x, y, ms = 650) => {
     const frames = Math.max(8, Math.round(ms / 16));
@@ -171,12 +194,29 @@ async function record(playwright, args) {
           await page.keyboard.press(step.key);
           break;
         case "scroll": {
-          const total = step.y || 0;
-          const frames = Math.max(1, Math.round((step.ms || 800) / 16));
-          for (let i = 0; i < frames; i++) {
-            await page.mouse.wheel(0, total / frames);
-            await page.waitForTimeout(16);
-          }
+          await smoothWheel(step.y || 0, step.ms || 800);
+          break;
+        }
+        case "scrollto": {
+          // Smoothly bring an element to the middle of the viewport (plus an optional offset).
+          const locator = page.locator(step.selector).first();
+          await locator.waitFor({ state: "attached", timeout: 20000 });
+          const box = await locator.boundingBox();
+          if (!box) throw new Error(`Không thấy phần tử: ${step.selector}`);
+          await smoothWheel(box.y + box.height / 2 - viewport.height / 2 + (step.offset || 0), step.ms || 1000);
+          break;
+        }
+        case "scene":
+          if (scene) throw new Error(`Cảnh '${scene.id}' chưa có bước "end".`);
+          scene = { id: step.id, duration: step.duration, start: now() };
+          break;
+        case "end": {
+          if (!scene) throw new Error('Bước "end" không có "scene" đi trước.');
+          const remaining = scene.duration - (now() - scene.start);
+          if (remaining > 0) await page.waitForTimeout(remaining * 1000);
+          else scene.overrun = Math.round(-remaining * 100) / 100;
+          log.scenes.push(scene);
+          scene = null;
           break;
         }
         case "mark":
@@ -210,7 +250,7 @@ async function record(playwright, args) {
   let output = null;
   if (rawPath && fs.existsSync(rawPath)) {
     const mp4 = path.join(outDir, `${name}.mp4`);
-    const ffmpeg = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", rawPath, "-r", "30", "-c:v", "libx264", "-preset", "medium",
+    const ffmpeg = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", rawPath, "-vf", `scale=${format.width}:${format.height}:flags=lanczos`, "-r", "30", "-c:v", "libx264", "-preset", "medium",
       "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", mp4], { encoding: "utf8" });
     if (ffmpeg.status === 0) {
       output = mp4;
@@ -232,6 +272,17 @@ async function record(playwright, args) {
       log.videoOffset = Math.round((log.duration - videoDuration) * 100) / 100;
     }
   }
+  // Cut one clip per recorded scene, each exactly as long as asked.
+  if (output && output.endsWith(".mp4") && log.scenes.length && Number.isFinite(log.videoOffset)) {
+    for (const item of log.scenes) {
+      const start = Math.max(0, item.start - log.videoOffset);
+      const clip = path.join(outDir, `${item.id}.mp4`);
+      const cut = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", start.toFixed(3), "-i", output, "-t", item.duration.toFixed(3),
+        "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", clip], { encoding: "utf8" });
+      item.file = cut.status === 0 ? path.basename(clip) : null;
+      item.videoStart = Math.round(start * 100) / 100;
+    }
+  }
   fs.writeFileSync(path.join(outDir, `${name}.log.json`), JSON.stringify(log, null, 2));
 
   // Record where the footage came from next to the other project assets.
@@ -243,6 +294,7 @@ async function record(playwright, args) {
   }
 
   console.log(JSON.stringify({ file: output, log: path.join(outDir, `${name}.log.json`), duration: log.duration, steps: log.steps.length,
+    scenes: log.scenes.map((x) => ({ id: x.id, file: x.file, overrun: x.overrun || 0 })),
     shots: log.shots.map((s) => s.file), error: log.error || null }, null, 2));
   if (log.error) process.exit(1);
 }

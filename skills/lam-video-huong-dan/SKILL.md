@@ -56,7 +56,7 @@ Viết `script.json` đầy đủ theo định dạng trong `references/kich-ban
 **Cổng 5 — Tài sản thật.**
 Đọc `references/tai-san-that.md`. Với mỗi cảnh cần hình:
 - Logo: `logo <thương hiệu hoặc tên miền> --out <dự án>/assets/logos`, mở từng ứng viên ra xem, chọn bản đúng.
-- Màn hình: viết file bước từ `research.md`, quay bằng `node scripts/capture.cjs --steps ... --out <dự án>/captures --format <short|long>`. Xem lại video và ảnh; quay lại nếu có banner, dữ liệu riêng tư, hoặc con trỏ giật.
+- Màn hình: viết file bước từ `research.md`, quay bằng `node scripts/capture.cjs --steps ... --out <dự án>/captures --format <short|long>`. Để hình khớp lời, quay **sau khi đã có giọng đọc** và dùng `scene`/`end` với độ dài lấy từ `audio/manifest.json` (xem "Quay khớp độ dài lời đọc" trong tài liệu); tức là phần quay màn hình của cổng này làm sau Cổng 6. Xem lại từng đoạn: trích khung hình ra xem, quay lại nếu có banner, dữ liệu riêng tư, con trỏ giật, hoặc khung không phủ kín.
 - Màu: lấy màu thương hiệu của chủ đề (hoặc `accent` của kênh), chạy `theme --accent "#..." --out <dự án>/assets/theme.css`.
 Gửi người dùng bảng: file, dùng cho cảnh nào, nguồn. Kèm khung hình chính của mỗi đoạn quay. Tài sản không lấy được thì nêu ra và hỏi, không thay bằng đồ tự vẽ.
 

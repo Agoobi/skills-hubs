@@ -54,7 +54,27 @@ File bước:
 }
 ```
 
-Các lệnh: `goto`, `wait`, `move`, `click`, `type`, `scroll`, `key`, `mark` (đánh dấu mốc cho lúc dựng), `shot` (chụp ảnh tĩnh). `--format short` quay khung dọc 1080×1920; nhiều trang web hiện bản mobile ở khung này, đúng thứ người xem điện thoại sẽ thấy.
+Các lệnh: `goto`, `wait`, `move`, `click`, `type`, `scroll`, `scrollto` (cuộn mượt đưa một phần tử vào giữa khung), `key`, `mark` (đánh dấu mốc cho lúc dựng), `shot` (chụp ảnh tĩnh), `scene` / `end` (xem dưới). `--format short` quay khung dọc 1080×1920; nhiều trang web hiện bản mobile ở khung này, đúng thứ người xem điện thoại sẽ thấy.
+
+### Quay khớp độ dài lời đọc
+
+Cách cho hình và lời khớp nhau mà không phải cắt ghép bằng tay: **tạo lời đọc trước, rồi quay mỗi cảnh dài đúng bằng lời đọc của nó**.
+
+```json
+{ "do": "scene", "id": "s12-ask", "duration": 7.78 },
+{ "do": "move", "selector": "main >> text=Is the beige silk bedding set" },
+{ "do": "end" }
+```
+
+Các bước nằm giữa `scene` và `end` được chạy, phần thời gian còn thiếu được chờ cho đủ `duration`, rồi script cắt ra file `<id>.mp4` dài đúng chừng đó. `duration` của một cảnh = mốc bắt đầu của cảnh sau trừ mốc bắt đầu của cảnh này trong `audio/manifest.json`. Nhiều cảnh liền nhau trên cùng một trang đặt trong cùng một phiên quay để con trỏ và vị trí cuộn nối tiếp tự nhiên. Kết quả báo `overrun` nếu các bước chạy lâu hơn `duration`: khi đó bớt bước hoặc rút ngắn `ms`.
+
+Vì vậy với cảnh quay màn hình, thứ tự thực tế là: duyệt lời đọc (Cổng 4) → tạo giọng (Cổng 6) → quay (Cổng 5). Logo và màu vẫn làm ở Cổng 5 như thường.
+
+### Phóng to nội dung trang
+
+Nhiều trang giới hạn bề rộng nội dung, nên quay ở 1920×1080 sẽ thừa lề hai bên. Thêm `"viewport": { "width": 1440, "height": 810 }` vào file bước: trang được dựng ở khung nhỏ hơn rồi video được phóng lên đúng kích thước xuất, chữ to hơn khoảng 1,33 lần và hơi mềm hơn một chút so với quay gốc. Toạ độ trong log là theo khung `viewport`; nhân với `scale` trong log để ra toạ độ trên video.
+
+Chọn phần tử bằng `main >> text=...` thay vì `text=...` khi trang có menu ẩn chứa cùng dòng chữ, nếu không script sẽ chờ một phần tử không bao giờ hiện.
 
 ### Trước khi quay
 
