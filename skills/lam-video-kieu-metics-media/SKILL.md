@@ -1,7 +1,7 @@
 ---
-name: lam-video-huong-dan
+name: lam-video-kieu-metics-media
 description: Làm video hướng dẫn kiểu Metics Media, ngắn hoặc dài.
-version: 0.1.0
+version: 0.2.0
 author: Agoobi
 license: MIT
 metadata:
@@ -10,11 +10,20 @@ metadata:
     tags: [video, tutorial, tiktok, youtube, hyperframes, vietnamese]
 ---
 
-# lam-video-huong-dan
+# lam-video-kieu-metics-media
 
 Làm video hướng dẫn không lộ mặt theo ngôn ngữ hình ảnh của Metics Media: mở bằng kết quả thật, đồ hoạ giải thích sạch, thẻ chương, quay màn hình thật có zoom. Hỗ trợ **video ngắn** (dọc, 25–60 giây) và **video dài** (ngang, 3–25 phút), **nhiều kênh** với giọng và người xem riêng. Giọng đọc tạo qua OpenRouter. Dựng và xuất bằng HyperFrames.
 
 Dùng skill này khi người dùng muốn làm video hướng dẫn, video mẹo, video "mổ lỗi", tutorial công cụ, hoặc nói "làm video kiểu Metics Media", "làm short/TikTok hướng dẫn", "làm video dài cho YouTube" cho một kênh đã cấu hình.
+
+## Nguồn phong cách
+
+Skill này **phỏng theo phong cách dựng của kênh YouTube Metics Media** (https://www.youtube.com/@MeticsMedia). Bố cục video, nhịp cắt, kiểu đồ hoạ giải thích, thẻ chương và cách quay màn hình được rút ra từ việc xem khung hình của hai video trên kênh đó vào tháng 10/2026:
+
+- "How to Build $10K Websites in Minutes (Claude AI)"
+- "Hermes Agent - Full Tutorial & Setup Guide (For Beginners)"
+
+Chi tiết quan sát và số đo nằm trong `references/phan-tich-phong-cach.md`. Skill chỉ học **cách làm**; nó không dùng lại hình ảnh, logo, giọng, nhạc hay lời thoại của Metics Media, và không có liên kết hay bảo trợ nào từ kênh đó. Phần video ngắn là bản chuyển thể, vì kênh gốc không làm Shorts.
 
 ## Quy tắc không được phá
 
