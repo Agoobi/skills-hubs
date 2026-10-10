@@ -42,7 +42,7 @@ Lệnh Python chạy từ thư mục skill: `python -I scripts/video.py <lệnh>
 Bắt đầu mỗi video: chạy `channels` và `check`. Thiếu settings hoặc thiếu công cụ thì hướng dẫn phần Cài đặt rồi dừng.
 
 **Cổng 1 — Kênh, định dạng, mục tiêu.**
-Liệt kê kênh (label + alias). Hỏi gọn trong một lượt: kênh nào; **ngắn hay dài** (gợi ý `default_format` nhưng phải xác nhận); chủ đề; người xem cần làm được gì sau khi xem; link sản phẩm/trang liên quan; tài sản người dùng đã có (video quay sẵn, tài khoản thử). Chủ đề lạc khỏi `topics` của kênh thì nói rõ và hỏi lại. Sau khi chốt: `init <thư mục dự án> --channel <alias> --format short|long`.
+Liệt kê kênh (label + alias). Hỏi gọn trong một lượt: kênh nào; **ngắn hay dài** (gợi ý `default_format` nhưng phải xác nhận); chủ đề; người xem cần làm được gì sau khi xem; link sản phẩm/trang liên quan; tài sản người dùng đã có (video quay sẵn, tài khoản thử). Chủ đề lạc khỏi `topics` của kênh thì nói rõ và hỏi lại. Sau khi chốt: `init "<tên video>" --channel <alias> --format short|long`. Lệnh tạo thư mục dự án `tmp/<kênh>/<tên-video-không-dấu>/` ngay trong thư mục skill và in ra đường dẫn; mọi file của video nằm trong đó (xem mục Thư mục video).
 
 **Cổng 2 — Nghiên cứu trên sản phẩm thật.**
 Mở trang thật bằng trình duyệt và tự đi qua luồng định hướng dẫn. Ghi `research.md` trong dự án: từng bước theo đúng thứ tự, tên nút đúng chữ trên màn hình, giá và giới hạn kèm URL nguồn, chỗ dễ sai, và ảnh chụp mỗi bước. Bước nào cần đăng nhập hoặc không tự kiểm chứng được thì ghi rõ "chưa kiểm chứng" và hỏi người dùng. Trình bày tóm tắt; người dùng xác nhận luồng đúng.
@@ -74,9 +74,30 @@ Nạp skill `/hyperframes` rồi `/hyperframes-core` (hợp đồng dựng), `/g
 Chạy `npx hyperframes check` tới khi sạch lỗi. Chụp ảnh tĩnh ở giữa mỗi cảnh (`snapshot`) và **tự xem từng ảnh**: chữ tràn, logo vỡ, vùng an toàn. Mở bản xem trước cho người dùng; sửa theo góp ý.
 
 **Cổng 9 — Kiểm cuối và xuất.**
-Chạy danh sách kiểm ở cuối `references/edit-tokens.md` và báo kết quả từng mục. Người dùng đồng ý thì `npx hyperframes render`. Xem lại file mp4: khung đầu, khung cuối, một khung giữa mỗi chương, và nghe đoạn đầu.
+Chạy danh sách kiểm ở cuối `references/edit-tokens.md` và báo kết quả từng mục. Người dùng đồng ý thì `npx hyperframes render`, xuất ra đúng đường dẫn `output` ghi trong `project.json` (`output/<tên-video>.mp4`). Xem lại file mp4: khung đầu, khung cuối, một khung giữa mỗi chương, và nghe đoạn đầu.
 
-**Bàn giao.** Gửi: đường dẫn file mp4, thời lượng, kênh và định dạng; tiêu đề đề xuất, mô tả, hashtag theo nền tảng của kênh; với video dài thêm mốc chương cho YouTube và 2–3 ý chữ cho thumbnail; danh sách nguồn từ `assets/ledger.json`. Nhắc người dùng tự xem lại và tự đăng.
+Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `output/metadata.json` với một khối cho mỗi nền tảng của kênh. Điền tiêu đề, mô tả, caption, hashtag theo `references/metadata.md`, rồi `metadata check --project <dự án>` tới khi không còn mục nào trong `problems`. Đưa người dùng xem nội dung đã điền.
+
+**Bàn giao.** Gửi: đường dẫn thư mục `output/`, file mp4, thời lượng, kênh và định dạng; đường dẫn `output/metadata.json` và tóm tắt nội dung từng nền tảng (tiêu đề, caption, hashtag; video dài có mốc chương và ý chữ cho thumbnail). Nhắc người dùng tự xem lại và tự đăng.
+
+## Thư mục video
+
+```
+<thư mục skill>/tmp/<kênh>/<tên-video>/
+├── project.json          kênh, định dạng, kích thước, đường dẫn xuất
+├── research.md           Cổng 2
+├── script.json           Cổng 4
+├── storyboard.md         Cổng 7
+├── assets/               logos/, fonts/, theme.css, ledger.json (sổ nguồn)
+├── captures/             video và ảnh quay màn hình, file bước, log
+├── audio/                lời đọc từng cảnh + manifest.json
+├── (file dựng HyperFrames)
+└── output/
+    ├── <tên-video>.mp4   video hoàn chỉnh
+    └── metadata.json     tiêu đề, mô tả, caption, hashtag, mốc chương cho từng nền tảng
+```
+
+`tmp/` bị `.gitignore`. Người dùng chỉ cần lấy thư mục `output/`.
 
 ## Sửa video đã làm
 
@@ -91,5 +112,6 @@ Chạy danh sách kiểm ở cuối `references/edit-tokens.md` và báo kết q
 | `references/tai-san-that.md` | Cổng 2 và 5 |
 | `references/edit-tokens.md` | Cổng 7, 8, 9 |
 | `references/design-tokens.md` | Cổng 5 (màu) và 8 |
+| `references/metadata.md` | Cổng 9: điền `output/metadata.json` |
 | `references/settings-schema.md` | Cài đặt, thêm kênh |
 | `assets/blocks.html` | Xem trước các khối giao diện |

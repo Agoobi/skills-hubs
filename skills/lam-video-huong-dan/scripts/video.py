@@ -4,7 +4,8 @@
 Commands:
   channels                      list configured channels (never prints the API key)
   check [--online]              verify settings, tools and (with --online) the OpenRouter key
-  init <dir>                    create a video project skeleton
+  init "<video name>"           create tmp/<channel>/<video>/ for a new video
+  metadata init|check           write or validate output/metadata.json for upload
   theme --accent "#RRGGBB"      derive the full colour theme from one brand accent
   logo <brand-or-domain>        download real logo candidates and record their sources
   tts                           synthesise one piece of narration
@@ -25,6 +26,7 @@ import struct
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,6 +35,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SETTINGS_PATH = SKILL_DIR / "settings.json"
+WORK_ROOT = SKILL_DIR / "tmp"
 USER_AGENT = "lam-video-huong-dan/0.1 (+https://github.com/Agoobi/skills-hubs)"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_TTS_MODEL = "google/gemini-3.1-flash-tts-preview"
@@ -180,25 +183,187 @@ def cmd_check(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def slugify(value: str) -> str:
+    """ASCII, lower-case, hyphenated. Vietnamese diacritics are stripped, not dropped."""
+    value = value.replace("đ", "d").replace("Đ", "D")
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:80]
+
+
+def project_dir(alias: str, name: str) -> Path:
+    slug = slugify(name)
+    if not slug:
+        die("Tên video cần có ít nhất một chữ cái hoặc số.")
+    return WORK_ROOT / slugify(alias) / slug
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     settings = load_settings()
     alias, cfg = channel(settings, args.channel)
     fmt = args.format or cfg.get("default_format")
     if fmt not in FORMATS:
         die("Cần --format short hoặc long (hoặc đặt default_format cho kênh).")
-    root = Path(args.dir).resolve()
-    for sub in ("assets/logos", "assets/fonts", "captures", "audio", "renders"):
-        (root / sub).mkdir(parents=True, exist_ok=True)
-    project = {"channel": alias, "format": fmt, **{k: FORMATS[fmt][k] for k in ("width", "height", "fps")},
-               "language": cfg.get("language", "vi"), "created": time.strftime("%Y-%m-%d")}
+    root = project_dir(alias, args.name)
     project_file = root / "project.json"
     if project_file.exists() and not args.force:
-        die(f"{project_file} đã tồn tại. Thêm --force để ghi đè.")
+        die(f"{project_file} đã tồn tại. Đổi tên video hoặc thêm --force để ghi đè.")
+    for sub in ("assets/logos", "assets/fonts", "captures", "audio", "output"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
+    project = {"name": args.name, "slug": root.name, "channel": alias, "format": fmt,
+               **{k: FORMATS[fmt][k] for k in ("width", "height", "fps")},
+               "language": cfg.get("language", "vi"), "created": time.strftime("%Y-%m-%d"),
+               "output": f"output/{root.name}.mp4"}
     project_file.write_text(json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     ledger = root / "assets" / "ledger.json"
     if not ledger.exists():
         ledger.write_text("[]\n", encoding="utf-8")
     print(json.dumps({"project": str(root), **project}, ensure_ascii=False, indent=2))
+
+
+# ---------------------------------------------------------------- metadata
+
+# Conservative platform limits. A platform may allow more; staying under these is always safe.
+LIMITS = {
+    "youtube": {"title": 100, "description": 5000, "tags_total": 500},
+    "youtube-shorts": {"title": 100, "description": 5000},
+    "tiktok": {"caption": 2200, "hashtags": 5},
+    "reels": {"caption": 2200, "hashtags": 5},
+    "facebook": {"caption": 2200},
+}
+
+
+def load_project(path: str) -> tuple[Path, dict]:
+    root = Path(path).resolve()
+    project_file = root / "project.json"
+    if not project_file.exists():
+        die(f"Không thấy {project_file}. Truyền --project là thư mục video trong tmp/<kênh>/<video>.")
+    return root, json.loads(project_file.read_text(encoding="utf-8"))
+
+
+def clock(seconds: float) -> str:
+    seconds = int(seconds)
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
+
+
+def probe_video(path: Path) -> dict:
+    probe = shutil.which("ffprobe")
+    if not probe or not path.exists():
+        return {}
+    out = subprocess.run([probe, "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=width,height:format=duration,size", "-of", "json", str(path)],
+                         capture_output=True, text=True, timeout=60)
+    try:
+        data = json.loads(out.stdout)
+        stream = data["streams"][0]
+        return {"width": stream["width"], "height": stream["height"],
+                "duration": round(float(data["format"]["duration"]), 2), "bytes": int(data["format"]["size"])}
+    except (KeyError, IndexError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def platform_block(platform: str, project: dict, cfg: dict, chapters: list[dict]) -> dict:
+    cta = cfg.get("cta", "")
+    if platform == "youtube":
+        return {"title": "", "description": "", "tags": [], "chapters": chapters, "thumbnail_text": [],
+                "category": "Science & Technology", "language": project.get("language", "vi"),
+                "visibility": "private", "made_for_kids": False, "pinned_comment": cta}
+    if platform == "youtube-shorts":
+        return {"title": "", "description": "", "hashtags": ["#shorts"], "visibility": "private",
+                "made_for_kids": False}
+    if platform in ("tiktok", "reels"):
+        return {"caption": "", "hashtags": [], "cover_time": 0.0}
+    return {"caption": ""}
+
+
+def cmd_metadata(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    root, project = load_project(args.project)
+    alias, cfg = channel(settings, project.get("channel"))
+    meta_path = root / "output" / "metadata.json"
+    video_path = root / project.get("output", f"output/{root.name}.mp4")
+
+    if args.action == "init":
+        if meta_path.exists() and not args.force:
+            die(f"{meta_path} đã tồn tại. Thêm --force để tạo lại (nội dung đã điền sẽ mất).")
+        chapters: list[dict] = []
+        manifest_path, script_path = root / "audio" / "manifest.json", root / "script.json"
+        if project.get("format") == "long" and manifest_path.exists() and script_path.exists():
+            starts = {s["id"]: s["start"] for s in json.loads(manifest_path.read_text(encoding="utf-8"))["scenes"]}
+            for scene in json.loads(script_path.read_text(encoding="utf-8")).get("scenes", []):
+                if scene.get("kind") == "chapter" and scene["id"] in starts:
+                    chapters.append({"time": clock(starts[scene["id"]]),
+                                     "title": scene.get("on_screen") or scene.get("title") or ""})
+            # YouTube only shows chapters when the list starts at 0:00.
+            if chapters and chapters[0]["time"] != "0:00":
+                chapters.insert(0, {"time": "0:00", "title": "Mở đầu" if project.get("language") == "vi" else "Intro"})
+        ledger_path = root / "assets" / "ledger.json"
+        sources = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else []
+        platforms = [p for p in cfg.get("platforms", []) if not (
+            (p == "youtube" and project.get("format") == "short") or
+            (p in ("youtube-shorts", "tiktok", "reels") and project.get("format") == "long"))]
+        metadata = {
+            "video": {"file": video_path.name, "name": project.get("name", root.name), "channel": alias,
+                      "channel_label": cfg.get("label", ""), "handle": cfg.get("handle", ""),
+                      "format": project.get("format"), "language": project.get("language"),
+                      "created": project.get("created"), **probe_video(video_path)},
+            "platforms": {p: platform_block(p, project, cfg, chapters) for p in platforms},
+            "sources": [{"file": e.get("file"), "source": e.get("source"), "kind": e.get("kind")} for e in sources],
+        }
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({"metadata": str(meta_path), "platforms": platforms, "chapters": len(chapters),
+                          "next": "Điền title/description/caption/hashtags cho từng nền tảng rồi chạy `metadata check`."},
+                         ensure_ascii=False, indent=2))
+        return
+
+    if not meta_path.exists():
+        die(f"Chưa có {meta_path}. Chạy `metadata init --project ...` trước.")
+    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+    problems: list[str] = []
+    info = probe_video(video_path)
+    if not info:
+        problems.append(f"Chưa có file video {video_path.name} trong output/ (hoặc thiếu ffprobe).")
+    else:
+        metadata["video"].update(info)
+        expected = FORMATS.get(project.get("format", ""), {})
+        if expected and (info["width"], info["height"]) != (expected["width"], expected["height"]):
+            problems.append(f"Kích thước video {info['width']}x{info['height']} không khớp định dạng {project.get('format')}.")
+    avoid = [w.lower() for w in cfg.get("avoid", [])]
+    for platform, block in metadata.get("platforms", {}).items():
+        limits = LIMITS.get(platform, {})
+        for field in ("title", "description", "caption"):
+            if field in block:
+                value = block[field].strip()
+                if not value and field != "description":
+                    problems.append(f"{platform}.{field} đang trống.")
+                if field in limits and len(value) > limits[field]:
+                    problems.append(f"{platform}.{field} dài {len(value)} ký tự, giới hạn {limits[field]}.")
+                for word in avoid:
+                    if word and word in value.lower():
+                        problems.append(f"{platform}.{field} chứa cụm cần tránh của kênh: '{word}'.")
+        if "tags" in block and len(",".join(block["tags"])) > limits.get("tags_total", 10 ** 9):
+            problems.append(f"{platform}.tags vượt {limits['tags_total']} ký tự.")
+        if "hashtags" in block:
+            bad = [h for h in block["hashtags"] if not re.fullmatch(r"#[^\s#]+", h)]
+            if bad:
+                problems.append(f"{platform}.hashtags sai dạng (cần '#tu-khoa', không khoảng trắng): {bad}")
+            if "hashtags" in limits and len(block["hashtags"]) > limits["hashtags"]:
+                problems.append(f"{platform}.hashtags có {len(block['hashtags'])} thẻ, nên tối đa {limits['hashtags']}.")
+        if block.get("chapters"):
+            times = [c.get("time") for c in block["chapters"]]
+            if times[0] != "0:00":
+                problems.append(f"{platform}.chapters phải bắt đầu ở 0:00.")
+            if len(times) < 3:
+                problems.append(f"{platform}.chapters cần ít nhất 3 mốc để YouTube hiển thị.")
+            if any(not c.get("title") for c in block["chapters"]):
+                problems.append(f"{platform}.chapters có mốc chưa có tiêu đề.")
+    meta_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"metadata": str(meta_path), "video": str(video_path) if info else None, "ok": not problems,
+                      "problems": problems}, ensure_ascii=False, indent=2))
+    if problems:
+        raise SystemExit(1)
 
 
 # ---------------------------------------------------------------- theme
@@ -518,11 +683,17 @@ def main() -> None:
     p.set_defaults(run=cmd_check)
 
     p = sub.add_parser("init")
-    p.add_argument("dir")
+    p.add_argument("name", help="Tên video; thư mục sẽ là tmp/<kênh>/<tên không dấu>")
     p.add_argument("--channel")
     p.add_argument("--format", choices=list(FORMATS))
     p.add_argument("--force", action="store_true")
     p.set_defaults(run=cmd_init)
+
+    p = sub.add_parser("metadata")
+    p.add_argument("action", choices=["init", "check"])
+    p.add_argument("--project", required=True)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(run=cmd_metadata)
 
     p = sub.add_parser("theme")
     p.add_argument("--accent", required=True)
