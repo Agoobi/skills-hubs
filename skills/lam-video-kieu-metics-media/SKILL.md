@@ -1,7 +1,7 @@
 ---
 name: lam-video-kieu-metics-media
 description: Làm video hướng dẫn kiểu Metics Media, ngắn hoặc dài.
-version: 0.4.0
+version: 0.5.0
 author: Agoobi
 license: MIT
 metadata:
@@ -27,7 +27,7 @@ Chi tiết quan sát và số đo nằm trong `references/phan-tich-phong-cach.m
 
 ## Quy tắc không được phá
 
-1. **Mỗi cổng dừng lại chờ người dùng duyệt.** Không gộp cổng, không tự đi tiếp. Người dùng muốn kiểm soát chất lượng ở từng bước; đi tiếp khi chưa duyệt là làm lại từ đầu.
+1. **Mỗi cổng dừng lại chờ người dùng duyệt.** Không gộp cổng, không tự đi tiếp. Người dùng muốn kiểm soát chất lượng ở từng bước; đi tiếp khi chưa duyệt là làm lại từ đầu. Ngoại lệ duy nhất: người dùng nói rõ "autopilot" (xem mục Chế độ autopilot). Các quy tắc 2–5 giữ nguyên ở mọi chế độ.
 2. **Không tự vẽ logo, không dựng giả màn hình sản phẩm.** Logo là file tải từ nguồn chính thức. Màn hình là ảnh hoặc video quay thật bằng trình duyệt. Thiếu thì hỏi người dùng, hoặc viết lại lời để không cần cảnh đó. Chi tiết: `references/tai-san-that.md`.
 3. **Không bịa.** Bước thao tác, giá, tên nút, kết quả phải có trong `research.md` kèm nguồn.
 4. **Không in API key ra chat.** Không gõ mật khẩu, không vượt CAPTCHA; người dùng tự đăng nhập.
@@ -90,6 +90,34 @@ Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `out
 Cuối cùng làm ảnh bìa: đọc `references/thumbnail.md`, đề xuất 2 ý (nhóm hình trên, nhóm hình dưới, chữ tối đa 4 từ) cho người dùng chọn, rồi chạy `thumbnail --project <dự án> --variants 2 --title "..." --scene "..."`. Tự mở từng ảnh ra kiểm chữ và linh vật trước khi gửi; bản người dùng chọn lưu thành `output/thumbnail.png`.
 
 **Bàn giao.** Gửi: đường dẫn thư mục `output/`, file mp4, ảnh bìa `thumbnail.png`, thời lượng, kênh và định dạng; đường dẫn `output/metadata.json` và tóm tắt nội dung từng nền tảng (tiêu đề, caption, hashtag; video dài có mốc chương và ý chữ cho thumbnail). Nhắc người dùng tự xem lại và tự đăng.
+
+## Chế độ autopilot
+
+Bật khi người dùng nhắc tới **"autopilot"** (hoặc nói rõ "chạy một mạch", "không cần hỏi", "tự làm hết") trong yêu cầu. Chỉ câu "tiếp đi" thì không bật: đó là duyệt cổng hiện tại. Chế độ này chỉ áp dụng cho video đang làm; video sau quay về từng cổng trừ khi người dùng nhắc lại.
+
+Khi bật, agent chạy liền từ Cổng 1 tới Bàn giao, không dừng chờ duyệt. Mỗi cổng vẫn làm đủ việc và ghi đủ file (`research.md`, `script.json`, `storyboard.md`, sổ nguồn, ảnh tĩnh từng cảnh, `metadata check`); chỉ bỏ bước chờ. Chỗ nào quy trình cần người dùng chọn thì agent tự quyết theo bảng dưới và **ghi lại quyết định kèm lý do**:
+
+| Cổng | Bình thường hỏi người dùng | Autopilot tự quyết |
+|---|---|---|
+| 1 | kênh, định dạng, mục tiêu | Lấy từ yêu cầu; thiếu thì dùng `default_channel`, `default_format` và `audience`, `cta` của kênh |
+| 2 | xác nhận luồng đúng | Chỉ dùng ý đã kiểm chứng; ý "chưa kiểm chứng" thì bỏ khỏi kịch bản |
+| 3 | chọn 1 trong 3 hook | Vẫn viết đủ 3 hook, chọn hook giữ được lời hứa bằng tài sản đang có |
+| 4 | duyệt lời đọc | Tự đọc soát theo `kich-ban.md`, `persona`, `avoid` |
+| 5 | duyệt tài sản | Tự mở từng logo và đoạn quay ra xem; cảnh thiếu tài sản thật thì viết lại lời để không cần cảnh đó |
+| 6 | chọn giọng | Dùng `voice` của kênh, không làm mẫu thử; lệch thời lượng thì tự cắt hoặc thêm câu rồi tạo lại |
+| 7–8 | duyệt bảng phân cảnh, bản xem trước | Tự xem ảnh tĩnh từng cảnh, sửa tới khi sạch |
+| 9 | đồng ý xuất, chọn ảnh bìa | Chạy hết danh sách kiểm rồi xuất; chọn 1 ý ảnh bìa, tạo 2 bản, lấy bản đạt làm `thumbnail.png` |
+
+Autopilot **vẫn dừng** khi không thể đi tiếp mà không phá quy tắc 2–5:
+
+- `check` báo lỗi, thiếu key hoặc hết hạn mức OpenRouter.
+- Cần đăng nhập, gặp CAPTCHA, hoặc phải quay dữ liệu riêng tư của khách.
+- Thiếu logo hay màn hình thật mà không viết lại lời để tránh được.
+- Chủ đề lạc hẳn khỏi `topics` của kênh, hoặc yêu cầu không đủ để biết làm video về cái gì.
+
+Khi dừng, nói rõ đang ở cổng nào và cần gì; người dùng trả lời xong thì chạy tiếp tới hết.
+
+Trong lúc chạy, báo một dòng ngắn mỗi khi xong một cổng. Ở Bàn giao, ngoài phần thường lệ, gửi thêm **bảng quyết định đã tự chọn** (hook nào và vì sao, ý nào bị bỏ, chỗ nào đã viết lại lời, ảnh bìa nào) và những thứ chưa kiểm được (ví dụ chưa nghe được âm thanh). Người dùng muốn đổi gì thì làm theo mục Sửa video đã làm.
 
 ## Thư mục video
 
