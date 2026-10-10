@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helper CLI for the lam-video-huong-dan skill. Standard library only.
+"""Helper CLI for the lam-video-kieu-metics-media skill. Standard library only.
 
 Commands:
   channels                      list configured channels (never prints the API key)
@@ -36,7 +36,7 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SETTINGS_PATH = SKILL_DIR / "settings.json"
 WORK_ROOT = SKILL_DIR / "tmp"
-USER_AGENT = "lam-video-huong-dan/0.1 (+https://github.com/Agoobi/skills-hubs)"
+USER_AGENT = "lam-video-kieu-metics-media/0.1 (+https://github.com/Agoobi/skills-hubs)"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_TTS_MODEL = "google/gemini-3.1-flash-tts-preview"
 FORMATS = {
@@ -565,7 +565,7 @@ def synthesize(settings: dict, cfg: dict, text: str, out_base: Path, *, voice: s
         status, headers, body = http(
             f"{openrouter.get('base_url', DEFAULT_BASE_URL)}/audio/speech", method="POST",
             headers={"Authorization": f"Bearer {api_key(settings)}", "Content-Type": "application/json",
-                     "X-Title": "lam-video-huong-dan"},
+                     "X-Title": "lam-video-kieu-metics-media"},
             body=json.dumps(payload).encode("utf-8"), timeout=300)
         if status == 200 and body:
             break
