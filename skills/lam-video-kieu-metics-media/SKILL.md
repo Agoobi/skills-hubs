@@ -1,7 +1,7 @@
 ---
 name: lam-video-kieu-metics-media
 description: Làm video hướng dẫn kiểu Metics Media, ngắn hoặc dài.
-version: 0.2.0
+version: 0.3.0
 author: Agoobi
 license: MIT
 metadata:
@@ -73,7 +73,7 @@ Gửi người dùng bảng: file, dùng cho cảnh nào, nguồn. Kèm khung h�
 Tạo mẫu câu hook bằng `tts --channel <alias> --text "..." --out <dự án>/audio/mau-1.wav`; nếu người dùng chưa chốt giọng thì làm 2 mẫu với hai `--voice` khác nhau. Người dùng nghe và chọn. Sau đó `tts-script --script <dự án>/script.json` tạo âm thanh cho mọi cảnh và ghi `audio/manifest.json` (thời lượng thật, mốc bắt đầu và kết thúc từng cảnh). Báo tổng thời lượng; lệch khỏi định dạng đã chốt thì đề xuất cắt hoặc thêm câu nào và quay lại Cổng 4.
 
 **Cổng 7 — Bảng phân cảnh theo thời gian thật.**
-Đọc `references/edit-tokens.md` và `references/design-tokens.md`. Lập `storyboard.md`: mỗi cảnh một dòng với mốc thời gian lấy từ `manifest.json`, kiểu hình, tài sản, chuyển động (zoom vào đâu theo `captures/*.log.json`, viên thuốc tên miền lúc nào), chữ trên hình. Kiểm theo giới hạn hình đứng yên của định dạng. Người dùng duyệt bảng này trước khi dựng.
+Đọc `references/edit-tokens.md` và `references/design-tokens.md`. Lập `storyboard.md`: mỗi cảnh một dòng với mốc thời gian lấy từ `manifest.json`, kiểu hình, tài sản, chuyển động (kiểu vào lấy tên trong mục "Từ vựng chuyển động", hai cảnh liền nhau không trùng kiểu; zoom vào đâu theo `captures/*.log.json`; viên thuốc tên miền lúc nào), chữ trên hình và mốc cụm chữ nhấn hiện ra. Kiểm theo giới hạn hình đứng yên của định dạng. Người dùng duyệt bảng này trước khi dựng.
 
 **Cổng 8 — Dựng bằng HyperFrames.**
 Nạp skill `/hyperframes` rồi `/hyperframes-core` (hợp đồng dựng), `/general-video` (video dài) và `/hyperframes-cli`. Dựng đúng `storyboard.md`:

@@ -45,6 +45,31 @@ Khi người dùng không nói rõ, hỏi ở Cổng 1. Không tự chọn.
 
 Không dùng: rung, nảy, xoay, chớp sáng, chuyển cảnh 3D. Phong cách này sạch và chậm vừa phải.
 
+## Từ vựng chuyển động
+
+Bảng trên cho con số. Bảng này cho **tên gọi**, để `storyboard.md` ghi được mỗi cảnh vào bằng kiểu nào thay vì cảnh nào cũng "trượt lên + mờ dần". Từ khoá mượn từ cách dựng explainer cắt dán (collage); chỉ mượn tên và nguyên tắc, còn biên độ đã hạ xuống cho hợp phong cách sạch ở trên. Bản máy đọc được: `assets/tokens.json > motion.entrances`.
+
+| Từ khoá | Phần tử vào thế nào | Giá trị | Hợp với |
+|---|---|---|---|
+| `rise` | trượt lên + mờ dần (kiểu mặc định ở bảng trên) | 24px, 0.45 giây, `power3.out` | chữ, dòng trong thẻ |
+| `grow` | phóng từ nhỏ lên, gốc ở tâm (chính là "thẻ nổi lên") | 0.94 → 1, 0.5 giây, `power3.out` | thẻ, khung trình duyệt |
+| `punch` | vào hơi to rồi co về đúng cỡ, không nảy lại | 1.12 → 1, 0.28 giây, `power4.out` | con số, cụm chữ nhấn |
+| `swipe` | trượt ngang từ mép vào | 80px, 0.4 giây, `power3.out` | viên thuốc tên miền, thẻ so sánh trái/phải |
+| `drop` | rơi từ trên xuống rồi dừng hẳn, không nảy | −60px, 0.4 giây, `power2.in` rồi dừng | dấu gạch, con dấu, thẻ "sai" |
+| `unfold` | mở ra theo một chiều bằng `clip-path` | 0.5 giây, `power2.inOut` | thẻ hoá đơn, danh sách, khối code |
+| `peel` | lớp phủ bóc chéo đi, lộ thứ bên dưới | 0.55 giây, `power2.inOut` | lật đáp án, trước/sau |
+| `draw` | nét vẽ chạy dần (`stroke-dashoffset`) | 0.5–0.8 giây, `power1.inOut` | mũi tên, đường nối, khoanh vùng |
+| `count` | số chạy tới giá trị thật | 0.6–1.2 giây, `power2.out` | số dư, giá, phần trăm |
+| `zoom-through` | cảnh cũ phóng qua khỏi khung, cảnh mới hiện ra | 1 → 1.8 + mờ, 0.35 giây | chuyển cảnh; tính chung hạn mức 1–2 lần với quét chéo |
+
+Quy tắc dùng:
+
+- **Hai cảnh liền nhau không vào cùng một kiểu.** Video từ 5 cảnh trở lên dùng ít nhất 3 kiểu. Chọn kiểu theo **động từ của câu lời đọc**: "bị trừ" thì `drop`, "mở ra xem" thì `unfold`, "hoá ra" thì `peel`, "tăng lên" thì `count`.
+- **Phần tử phụ vào lần lượt, không vào cùng lúc.** Trong một thẻ vẫn lệch 0.08–0.12 giây. Giữa các khối riêng trong một cảnh (2–4 khối) thì mỗi khối vào đúng lúc lời đọc nhắc tới nó.
+- **Một cảnh một cụm chữ nhấn** (`on_screen`): 2–5 từ, hiện đúng lúc lời đọc nói tới từ đó, không hiện từ đầu cảnh. Thời điểm ước lượng bằng `vị trí từ trong câu ÷ số từ × độ dài cảnh` (lấy từ `audio/manifest.json`), sau đó nghe lại và chỉnh. Đây không phải phụ đề; phụ đề của video ngắn vẫn giữ như mục dưới.
+- **Chuyển động nền sau khi vào xong**: phần tử chính trôi 4–6px theo chiều dọc hoặc thở 1 → 1.015, chu kỳ 4–6 giây, `sine.inOut`. Mỗi phần tử một pha lệch nhau để không cùng nhịp. Không áp lên chữ đang đọc và video quay màn hình. Chuyển động nền **không tính** là thay đổi để qua giới hạn hình đứng yên; giới hạn đó vẫn cần chuyển động có nghĩa.
+- Kiểu `flip`, `spiral`, `shatter`, `wobble`, `boing` của cách dựng cắt dán **không dùng** ở đây: chúng là xoay, nảy, rung.
+
 ## Thay thế cảnh người nói (video không lộ mặt)
 
 Metics Media dùng người nói ở các câu chuyển ý. Skill này thay bằng:
@@ -79,7 +104,9 @@ Sau khi `tts-script` chạy xong, nếu `words_per_minute` dưới 210 thì ch�
 | Nhạc nền | thấp hơn lời đọc 18–22 dB; tắt hẳn hoặc hạ thêm trong đoạn thao tác dài |
 | Khoảng lặng giữa hai cảnh lời đọc | 0.25–0.4 giây (dài), 0.1–0.2 giây (ngắn) |
 | Thẻ chương | lời đọc nghỉ, nhạc nhô lên 3 dB |
-| Hiệu ứng tiếng | chỉ tiếng nhấp chuột nhẹ và tiếng "whoosh" nhỏ khi thẻ vào; không bắt buộc |
+| Hiệu ứng tiếng | không bắt buộc; thấp hơn lời đọc 12–16 dB; đặt đúng mốc phần tử vào, không dồn ở đầu cảnh |
+| Tiếng theo kiểu vào | `rise`/`swipe`/`zoom-through`: whoosh nhỏ · `grow`/`punch`: pop · `drop`: thud · `unfold`/`peel`: tiếng giấy · `count`: tick hoặc coin · con trỏ bấm: click |
+| Đa dạng tiếng | hai cảnh liền nhau không dùng cùng một tiếng; mỗi mốc tối đa một tiếng |
 
 Nhạc và hiệu ứng tiếng phải có giấy phép rõ ràng; lấy qua `/media-use`. Không có nhạc phù hợp thì làm video không nhạc.
 
@@ -97,3 +124,4 @@ Nhạc và hiệu ứng tiếng phải có giấy phép rõ ràng; lấy qua `/m
 4. Mọi logo và ảnh màn hình có dòng nguồn trong `assets/ledger.json`.
 5. Chữ không tràn lề an toàn; ở video ngắn không nằm dưới vùng nút của nền tảng.
 6. Tổng thời lượng đúng định dạng đã chốt.
+7. Hai cảnh liền nhau không vào cùng một kiểu; mỗi cảnh có tối đa một cụm chữ nhấn, hiện đúng lúc lời đọc nói tới.
