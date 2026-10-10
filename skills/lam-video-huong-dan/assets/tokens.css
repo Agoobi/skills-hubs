@@ -1,0 +1,236 @@
+/*
+ * Tutorial video style blocks. Sizes are for a 1920x1080 frame; multiply type
+ * by 1.25 for 1080x1920. Replace the :root colours with the output of
+ * `video.py theme --accent <brand colour>` for each video.
+ *
+ * HyperFrames needs the font shipped inside the project: put the Inter Tight
+ * files in assets/fonts and declare @font-face in the composition.
+ */
+:root {
+  --accent: #E77B58;
+  --accent-soft: #E69F87;
+  --canvas: #FAF9F5;
+  --canvas-glow: #F4D2C6;
+  --card: #FDFCF8;
+  --card-tile: #EFE8E0;
+  --ink: #1C1917;
+  --ink-soft: #6A6360;
+  --chapter-bg: #1A110C;
+  --chapter-glow: #A5553A;
+  --chapter-numeral: #2A1A13;
+  --chapter-label: #B28C7F;
+  --chapter-title: #FEFCFB;
+  --chapter-title-dim: #705042;
+  --screen-bg: #141414;
+
+  --font: "Inter Tight", Inter, system-ui, sans-serif;
+  --radius-card: 24px;
+  --radius-tile: 12px;
+  --radius-browser: 18px;
+  --shadow-card: 0 2px 4px rgba(28, 25, 23, .04), 0 24px 60px -24px rgba(28, 25, 23, .22);
+  --shadow-browser: 0 40px 90px -40px rgba(28, 25, 23, .35);
+}
+
+/* Explainer background: near-white with the brand colour glowing in from two edges. */
+.tv-canvas {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(55% 70% at 100% 45%, var(--canvas-glow) 0%, transparent 70%),
+    radial-gradient(45% 60% at 0% 55%, color-mix(in srgb, var(--canvas-glow) 55%, transparent) 0%, transparent 70%),
+    var(--canvas);
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+/* Chapter card. Markup: .tv-chapter > .tv-chapter-numeral + .tv-chapter-label + .tv-chapter-title */
+.tv-chapter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 50% 100%, var(--chapter-glow) 0%, transparent 72%),
+    var(--chapter-bg);
+  font-family: var(--font);
+}
+.tv-chapter-numeral {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -56%;
+  font-size: 900px;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  color: var(--chapter-numeral);
+}
+.tv-chapter-label {
+  position: relative;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--chapter-label);
+}
+.tv-chapter-title {
+  position: relative;
+  max-width: 1500px;
+  text-align: center;
+  text-wrap: balance;
+  font-size: 96px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  color: var(--chapter-title);
+}
+.tv-chapter-title .is-pending { color: var(--chapter-title-dim); }
+
+/* Floating card. */
+.tv-card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 40px 44px;
+  font-family: var(--font);
+  color: var(--ink);
+}
+.tv-card-title { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; text-align: center; }
+.tv-tile { background: var(--card-tile); border-radius: var(--radius-tile); }
+
+/* Receipt: icon, dotted leader, figure. */
+.tv-receipt { width: 440px; }
+.tv-receipt-row { display: flex; align-items: center; gap: 16px; margin-top: 22px; font-size: 34px; font-weight: 600; letter-spacing: -0.02em; }
+.tv-receipt-row .lead { flex: 1; border-bottom: 2px dotted color-mix(in srgb, var(--ink-soft) 35%, transparent); translate: 0 -6px; }
+.tv-receipt-row svg, .tv-receipt-row img { width: 34px; height: 34px; color: var(--ink-soft); }
+
+/* Side-by-side comparison. */
+.tv-compare { display: flex; gap: 96px; }
+.tv-compare .tv-card { width: 400px; text-align: center; }
+.tv-compare-name { font-size: 54px; font-weight: 800; letter-spacing: -0.04em; }
+.tv-compare-price { margin-top: 4px; font-size: 40px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink-soft); }
+.tv-compare-price small { font-size: 22px; font-weight: 500; }
+.tv-meter { height: 16px; margin-top: 30px; border-radius: 999px; background: var(--card-tile); overflow: hidden; }
+.tv-meter > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+
+/* Pills. */
+.tv-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 26px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-soft) 45%, transparent);
+  font-family: var(--font);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.tv-url-pill {
+  position: absolute;
+  left: 96px;
+  bottom: 120px;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 30px 16px 22px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 12px 36px -12px rgba(0, 0, 0, .45);
+  font-family: var(--font);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #111;
+}
+.tv-url-pill img { width: 44px; height: 44px; object-fit: contain; }
+
+/* Tile that holds a real logo file. Never draw the logo. */
+.tv-logo-tile {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+.tv-logo-tile img { width: 62%; height: 62%; object-fit: contain; }
+
+/* Browser frame around a real screenshot or recording. */
+.tv-browser {
+  border-radius: var(--radius-browser);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-browser);
+}
+.tv-browser-bar { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 18px; background: color-mix(in srgb, var(--card-tile) 60%, #fff); }
+.tv-browser-bar i { width: 11px; height: 11px; border-radius: 50%; background: color-mix(in srgb, var(--ink-soft) 30%, transparent); }
+.tv-browser-bar span { flex: 1; height: 22px; margin-left: 12px; border-radius: 999px; background: #fff; }
+.tv-browser img, .tv-browser video { display: block; width: 100%; }
+
+/* Channel name plate. */
+.tv-lower-third {
+  position: absolute;
+  left: 96px;
+  bottom: 120px;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 34px 14px 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 12px 36px -12px rgba(0, 0, 0, .45);
+  font-family: var(--font);
+}
+.tv-lower-third img { width: 52px; height: 52px; object-fit: contain; }
+.tv-lower-third b { display: block; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; color: #111; line-height: 1.05; }
+.tv-lower-third small { display: block; font-size: 20px; font-weight: 600; color: var(--accent); }
+
+/* Burned-in captions. */
+.tv-caption-long {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  translate: -50% 0;
+  max-width: 1200px;
+  padding: 8px 20px;
+  border-radius: 10px;
+  background: rgba(10, 10, 10, .78);
+  font-family: var(--font);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+}
+.tv-caption-short {
+  font-family: var(--font);
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-align: center;
+  color: #fff;
+  -webkit-text-stroke: 10px rgba(10, 10, 10, .9);
+  paint-order: stroke fill;
+}
+.tv-caption-short .is-active { color: var(--accent); }
+
+/* Big statement on canvas, used where the reference channel cuts to a presenter. */
+.tv-statement {
+  max-width: 1400px;
+  font-family: var(--font);
+  font-size: 110px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--ink);
+}
+.tv-statement em { font-style: normal; color: var(--accent); }
