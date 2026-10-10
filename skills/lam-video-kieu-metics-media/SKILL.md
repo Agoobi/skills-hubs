@@ -1,7 +1,7 @@
 ---
 name: lam-video-kieu-metics-media
 description: Làm video hướng dẫn kiểu Metics Media, ngắn hoặc dài.
-version: 0.3.0
+version: 0.4.0
 author: Agoobi
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
 
 # lam-video-kieu-metics-media
 
-Làm video hướng dẫn không lộ mặt theo ngôn ngữ hình ảnh của Metics Media: mở bằng kết quả thật, đồ hoạ giải thích sạch, thẻ chương, quay màn hình thật có zoom. Hỗ trợ **video ngắn** (dọc, 25–60 giây) và **video dài** (ngang, 3–25 phút), **nhiều kênh** với giọng và người xem riêng. Giọng đọc tạo qua OpenRouter. Dựng và xuất bằng HyperFrames.
+Làm video hướng dẫn không lộ mặt theo ngôn ngữ hình ảnh của Metics Media: mở bằng kết quả thật, đồ hoạ giải thích sạch, thẻ chương, quay màn hình thật có zoom. Hỗ trợ **video ngắn** (dọc, 25–60 giây) và **video dài** (ngang, 3–25 phút), **nhiều kênh** với giọng và người xem riêng. Giọng đọc và ảnh bìa tạo qua OpenRouter. Dựng và xuất bằng HyperFrames.
 
 Dùng skill này khi người dùng muốn làm video hướng dẫn, video mẹo, video "mổ lỗi", tutorial công cụ, hoặc nói "làm video kiểu Metics Media", "làm short/TikTok hướng dẫn", "làm video dài cho YouTube" cho một kênh đã cấu hình.
 
@@ -87,7 +87,9 @@ Chạy danh sách kiểm ở cuối `references/edit-tokens.md` và báo kết q
 
 Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `output/metadata.json` với một khối cho mỗi nền tảng của kênh. Điền tiêu đề, mô tả, caption, hashtag theo `references/metadata.md`, rồi `metadata check --project <dự án>` tới khi không còn mục nào trong `problems`. Đưa người dùng xem nội dung đã điền.
 
-**Bàn giao.** Gửi: đường dẫn thư mục `output/`, file mp4, thời lượng, kênh và định dạng; đường dẫn `output/metadata.json` và tóm tắt nội dung từng nền tảng (tiêu đề, caption, hashtag; video dài có mốc chương và ý chữ cho thumbnail). Nhắc người dùng tự xem lại và tự đăng.
+Cuối cùng làm ảnh bìa: đọc `references/thumbnail.md`, đề xuất 2 ý (nhóm hình trên, nhóm hình dưới, chữ tối đa 4 từ) cho người dùng chọn, rồi chạy `thumbnail --project <dự án> --variants 2 --title "..." --scene "..."`. Tự mở từng ảnh ra kiểm chữ và linh vật trước khi gửi; bản người dùng chọn lưu thành `output/thumbnail.png`.
+
+**Bàn giao.** Gửi: đường dẫn thư mục `output/`, file mp4, ảnh bìa `thumbnail.png`, thời lượng, kênh và định dạng; đường dẫn `output/metadata.json` và tóm tắt nội dung từng nền tảng (tiêu đề, caption, hashtag; video dài có mốc chương và ý chữ cho thumbnail). Nhắc người dùng tự xem lại và tự đăng.
 
 ## Thư mục video
 
@@ -103,7 +105,8 @@ Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `out
 ├── (file dựng HyperFrames)
 └── output/
     ├── <tên-video>.mp4   video hoàn chỉnh
-    └── metadata.json     tiêu đề, mô tả, caption, hashtag, mốc chương cho từng nền tảng
+    ├── metadata.json     tiêu đề, mô tả, caption, hashtag, mốc chương cho từng nền tảng
+    └── thumbnail.png     ảnh bìa tranh minh hoạ, đúng kích thước định dạng
 ```
 
 `tmp/` bị `.gitignore`. Người dùng chỉ cần lấy thư mục `output/`.
@@ -122,5 +125,6 @@ Sau đó tạo thông tin đăng: `metadata init --project <dự án>` sinh `out
 | `references/edit-tokens.md` | Cổng 7, 8, 9 |
 | `references/design-tokens.md` | Cổng 5 (màu) và 8 |
 | `references/metadata.md` | Cổng 9: điền `output/metadata.json` |
+| `references/thumbnail.md` | Cổng 9: phong cách và cách tạo ảnh bìa |
 | `references/settings-schema.md` | Cài đặt, thêm kênh |
 | `assets/blocks.html` | Xem trước các khối giao diện |

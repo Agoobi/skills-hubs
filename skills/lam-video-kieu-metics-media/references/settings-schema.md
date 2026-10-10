@@ -9,6 +9,7 @@ Nằm cạnh `SKILL.md`, bị `.gitignore`. Copy từ `settings.example.json`.
 | `openrouter.api_key` | Key `sk-or-v1-...`. Biến môi trường `OPENROUTER_API_KEY` ưu tiên hơn file. Không in key ra chat. |
 | `openrouter.base_url` | Mặc định `https://openrouter.ai/api/v1`. |
 | `openrouter.tts_model` | Model đọc. Mặc định `google/gemini-3.1-flash-tts-preview` (đọc tốt tiếng Việt, trả về PCM, script tự bọc thành `.wav`). Xem model khác: `python -I scripts/video.py voices`. |
+| `openrouter.image_model` | Model vẽ ảnh bìa. Mặc định `google/gemini-3.1-flash-image` (nhận ảnh linh vật làm tham chiếu, viết được chữ tiếng Việt có dấu). |
 | `openrouter.response_format` | `pcm` (mặc định) hoặc `mp3` nếu model hỗ trợ. |
 
 ## Kênh
@@ -31,7 +32,9 @@ Nằm cạnh `SKILL.md`, bị `.gitignore`. Copy từ `settings.example.json`.
 | `topics` | Các mảng chủ đề của kênh, dùng để gợi ý và để từ chối chủ đề lạc kênh. |
 | `cta` | Câu kêu gọi cuối video. |
 | `accent` | Màu nhận diện cố định của kênh (`#RRGGBB`). Để trống thì lấy màu thương hiệu của chủ đề từng video. |
-| `logo` | Đường dẫn file logo thật của kênh. Để trống thì không hiện logo kênh. |
+| `logo` | Đường dẫn file logo thật của kênh (tuyệt đối, hoặc tính từ thư mục skill). Để trống thì không hiện logo kênh. Lệnh `thumbnail` dùng file này làm ảnh tham chiếu linh vật, nên cần PNG, JPG hoặc WebP. |
+| `image_model` | Ghi đè model vẽ ảnh bìa cho riêng kênh này (không bắt buộc). |
+| `thumbnail_style` | Đoạn tả phong cách ảnh bìa riêng của kênh, bằng tiếng Anh (không bắt buộc). Để trống thì dùng phong cách giấy kẻ ô trong `thumbnail.md`. |
 | `avoid` | Từ và cụm từ không dùng trong lời đọc và chữ trên hình. |
 | `captions` | `true` để dựng phụ đề vào video. Video ngắn luôn có phụ đề dù đặt gì. |
 | `music` | `true` nếu kênh dùng nhạc nền. |
@@ -46,5 +49,6 @@ Nằm cạnh `SKILL.md`, bị `.gitignore`. Copy từ `settings.example.json`.
 ## API dùng
 
 - `POST {base_url}/audio/speech` với `{model, input, voice, response_format[, speed]}`: trả về âm thanh. Với PCM, tần số lấy mẫu nằm trong header `Content-Type` (`rate=24000`).
+- `POST {base_url}/chat/completions` với `modalities: ["image", "text"]` và `image_config.aspect_ratio`: trả về ảnh bìa dạng data URL (lệnh `thumbnail`).
 - `GET {base_url}/key`: kiểm tra key và hạn mức (lệnh `check --online`).
 - `GET {base_url}/models?output_modalities=speech`: danh sách model đọc (lệnh `voices`).

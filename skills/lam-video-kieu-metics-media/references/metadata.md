@@ -55,7 +55,7 @@ Kiểm tra: `python -I scripts/video.py metadata check --project <dự án>`.
 }
 ```
 
-`video.width`, `height`, `duration`, `bytes` do `check` tự đo từ file mp4; không điền tay.
+`video.width`, `height`, `duration`, `bytes` do `check` tự đo từ file mp4; không điền tay. `video.thumbnail` do lệnh `thumbnail` ghi khi đã có `output/thumbnail.png`.
 
 ## Cách điền
 
@@ -80,7 +80,7 @@ Khi dán mô tả lên YouTube, chèn danh sách chương thành các dòng `0:0
 
 **Tags YouTube**: 5–10 cụm người xem sẽ gõ tìm, tổng không quá 500 ký tự.
 
-**thumbnail_text**: 2–3 phương án chữ cho ảnh bìa, mỗi phương án tối đa 4 từ. Skill không tự tạo ảnh bìa.
+**thumbnail_text**: 2–3 phương án chữ cho ảnh bìa, mỗi phương án tối đa 4 từ. Chữ được chọn dùng cho `--title` của lệnh `thumbnail` (xem `thumbnail.md`).
 
 **visibility**: luôn để `private`. Người dùng tự chuyển sang công khai khi đăng.
 
