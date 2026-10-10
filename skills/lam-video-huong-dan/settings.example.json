@@ -9,26 +9,39 @@
   "channels": {
     "kenh-chinh": {
       "label": "Kênh Chính",
-      "platforms": ["tiktok", "youtube-shorts"],
+      "platforms": [
+        "tiktok",
+        "youtube-shorts"
+      ],
       "handle": "@kenhchinh",
       "language": "vi",
       "default_format": "short",
-      "voice": "Kore",
-      "voice_style": "Nói tự nhiên như đang chỉ cho một người bạn, tốc độ vừa phải, rõ chữ",
+      "voice": "Charon",
+      "voice_style": "Giọng nam trẻ, đọc nhanh vừa phải, gọn và dứt khoát như người dẫn video hướng dẫn công nghệ, không kéo dài chữ",
       "speed": 1.0,
       "persona": "Xưng 'mình', gọi người xem là 'bạn'. Thẳng, cụ thể, không lên giọng dạy đời.",
       "audience": "Chủ shop online và người tự dựng web bằng AI, không rành kỹ thuật",
-      "topics": ["thanh toán tự động", "bảo mật web", "đưa web lên chạy thật"],
+      "topics": [
+        "thanh toán tự động",
+        "bảo mật web",
+        "đưa web lên chạy thật"
+      ],
       "cta": "Cần xử lý việc này cho web của bạn thì nhắn Zalo ở bio.",
       "accent": "",
       "logo": "",
-      "avoid": ["cam kết 100%", "siêu dễ", "ai cũng làm được"],
+      "avoid": [
+        "cam kết 100%",
+        "siêu dễ",
+        "ai cũng làm được"
+      ],
       "captions": true,
       "music": false
     },
     "kenh-tieng-anh": {
       "label": "English Channel",
-      "platforms": ["youtube"],
+      "platforms": [
+        "youtube"
+      ],
       "handle": "@englishchannel",
       "language": "en",
       "default_format": "long",
@@ -37,7 +50,11 @@
       "speed": 1.0,
       "persona": "First person, plain words, short sentences.",
       "audience": "Founders shipping their first AI-built web app",
-      "topics": ["payments", "deploys", "database migrations"],
+      "topics": [
+        "payments",
+        "deploys",
+        "database migrations"
+      ],
       "cta": "The checklist from this video is linked in the description.",
       "accent": "",
       "logo": "",

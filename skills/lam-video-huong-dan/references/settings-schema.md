@@ -22,9 +22,9 @@ Nằm cạnh `SKILL.md`, bị `.gitignore`. Copy từ `settings.example.json`.
 | `handle` | Tên kênh hiện ở thẻ tên và cuối video. |
 | `language` | `vi` hoặc `en`. Ngôn ngữ lời đọc và chữ trên hình. |
 | `default_format` | `short` hoặc `long`. Vẫn phải xác nhận lại ở Cổng 1. |
-| `voice` | Tên giọng của model đọc (ví dụ `Kore`, `Puck` với Gemini). |
-| `voice_style` | Một câu chỉ cách đọc. Được ghép vào đầu văn bản gửi cho model dưới dạng "`<voice_style>`: `<lời đọc>`". Để trống nếu model đọc luôn cả câu này thành tiếng. |
-| `speed` | Tốc độ đọc, 1.0 là bình thường. Chỉ gửi khi khác 1.0. |
+| `voice` | Tên giọng của model đọc. Với Gemini: giọng nam có `Charon` (rõ, điềm), `Puck` (trẻ, tươi), `Orus` (chắc); giọng nữ có `Kore`. Không sao chép được giọng của một người thật; chọn giọng có sẵn gần nhất rồi nghe thử. |
+| `voice_style` | Một câu chỉ cách đọc, và là cách **chính** để chỉnh nhịp: thử nghiệm cho thấy câu "đọc nhanh, gọn, dứt khoát" rút ngắn lời đọc khoảng một phần tư, còn để trống thì giọng đọc khá chậm. Được ghép vào đầu văn bản gửi cho model dưới dạng "`<voice_style>`: `<lời đọc>`". Để trống nếu model đọc luôn cả câu này thành tiếng. |
+| `speed` | Tốc độ đọc, 1.0 là giữ nguyên. Model đọc bỏ qua tham số tốc độ, nên script tự tăng/giảm tốc bằng ffmpeg sau khi tạo (giữ nguyên cao độ). Dùng 1.05–1.15 để nhanh hơn một chút; trên 1.2 bắt đầu nghe không tự nhiên. Muốn nhanh hơn nhiều thì sửa `voice_style` trước. |
 | `tts_model` | Ghi đè model đọc cho riêng kênh này (không bắt buộc). |
 | `persona` | Cách xưng hô và giọng văn. Lời đọc phải theo đúng. |
 | `audience` | Người xem mục tiêu. Quyết định độ sâu kỹ thuật và ví dụ. |

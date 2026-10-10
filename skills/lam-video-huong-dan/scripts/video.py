@@ -40,8 +40,8 @@ USER_AGENT = "lam-video-huong-dan/0.1 (+https://github.com/Agoobi/skills-hubs)"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_TTS_MODEL = "google/gemini-3.1-flash-tts-preview"
 FORMATS = {
-    "short": {"width": 1080, "height": 1920, "fps": 30, "gap": 0.15, "chapter_hold": 0.0},
-    "long": {"width": 1920, "height": 1080, "fps": 30, "gap": 0.3, "chapter_hold": 2.8},
+    "short": {"width": 1080, "height": 1920, "fps": 30, "gap": 0.1, "chapter_hold": 0.0},
+    "long": {"width": 1920, "height": 1080, "fps": 30, "gap": 0.2, "chapter_hold": 2.0},
 }
 
 for stream in (sys.stdout, sys.stderr):
@@ -558,8 +558,8 @@ def synthesize(settings: dict, cfg: dict, text: str, out_base: Path, *, voice: s
     spoken = f"{style.strip()}: {text.strip()}" if style and style.strip() else text.strip()
     payload: dict = {"model": model, "input": spoken, "voice": voice,
                      "response_format": openrouter.get("response_format", "pcm")}
-    if speed and abs(float(speed) - 1.0) > 1e-6:
-        payload["speed"] = float(speed)
+    # The speech model ignores a numeric speed, so tempo is applied locally after synthesis.
+    tempo = float(speed) if speed and abs(float(speed) - 1.0) > 1e-6 else None
     last_error = ""
     for attempt in range(3):
         status, headers, body = http(
@@ -588,8 +588,20 @@ def synthesize(settings: dict, cfg: dict, text: str, out_base: Path, *, voice: s
     else:
         out = out_base.with_suffix(".mp3")
         out.write_bytes(body)
+    if tempo:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            die("Cần ffmpeg để áp dụng 'speed' khác 1.0.")
+        if not 0.5 <= tempo <= 2.0:
+            die("'speed' phải nằm trong khoảng 0.5 đến 2.0.")
+        paced = out.with_name(out.stem + ".tempo" + out.suffix)
+        done = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(out), "-filter:a", f"atempo={tempo}", str(paced)],
+                              capture_output=True, text=True, timeout=120)
+        if done.returncode != 0:
+            die(f"ffmpeg không đổi được tốc độ: {done.stderr.strip()[:200]}")
+        paced.replace(out)
     return {"file": str(out), "duration": round(audio_duration(out), 3), "model": model, "voice": voice,
-            "style": style or "", "chars": len(text)}
+            "style": style or "", "speed": tempo or 1.0, "chars": len(text)}
 
 
 def cmd_tts(args: argparse.Namespace) -> None:

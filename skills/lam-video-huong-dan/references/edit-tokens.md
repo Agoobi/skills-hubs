@@ -58,6 +58,19 @@ Metics Media dùng người nói ở các câu chuyển ý. Skill này thay bằ
 
 Không tạo người ảo, không dùng ảnh người lấy trên mạng.
 
+## Nhịp lời đọc
+
+Bản dựng đầu tiên của skill bị người dùng nhận xét là **hơi chậm**. Nguyên nhân: giọng đọc mặc định chỉ khoảng 175 từ/phút, và mỗi cảnh có thêm khoảng lặng.
+
+| Token | Giá trị |
+|---|---|
+| Tốc độ lời đọc tiếng Việt | 210–240 từ/phút (đo bằng `words_per_minute` mà `tts-script` in ra) |
+| Cách đạt | `voice_style` yêu cầu đọc nhanh, gọn; nếu vẫn dưới 210 thì thêm `speed` 1.05–1.15 |
+| Khoảng lặng giữa hai cảnh | 0.15–0.25 giây (dài), 0.1 giây (ngắn) |
+| Thẻ chương | 1.8–2.2 giây |
+
+Sau khi `tts-script` chạy xong, nếu `words_per_minute` dưới 210 thì chỉnh rồi tạo lại trước khi quay và dựng.
+
 ## Âm thanh
 
 | Token | Giá trị |
