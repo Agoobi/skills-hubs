@@ -1,0 +1,49 @@
+{
+  "openrouter": {
+    "api_key": "sk-or-v1-DAN_KEY_OPENROUTER_VAO_DAY",
+    "base_url": "https://openrouter.ai/api/v1",
+    "tts_model": "google/gemini-3.1-flash-tts-preview",
+    "response_format": "pcm"
+  },
+  "default_channel": "kenh-chinh",
+  "channels": {
+    "kenh-chinh": {
+      "label": "Kênh Chính",
+      "platforms": ["tiktok", "youtube-shorts"],
+      "handle": "@kenhchinh",
+      "language": "vi",
+      "default_format": "short",
+      "voice": "Kore",
+      "voice_style": "Nói tự nhiên như đang chỉ cho một người bạn, tốc độ vừa phải, rõ chữ",
+      "speed": 1.0,
+      "persona": "Xưng 'mình', gọi người xem là 'bạn'. Thẳng, cụ thể, không lên giọng dạy đời.",
+      "audience": "Chủ shop online và người tự dựng web bằng AI, không rành kỹ thuật",
+      "topics": ["thanh toán tự động", "bảo mật web", "đưa web lên chạy thật"],
+      "cta": "Cần xử lý việc này cho web của bạn thì nhắn Zalo ở bio.",
+      "accent": "",
+      "logo": "",
+      "avoid": ["cam kết 100%", "siêu dễ", "ai cũng làm được"],
+      "captions": true,
+      "music": false
+    },
+    "kenh-tieng-anh": {
+      "label": "English Channel",
+      "platforms": ["youtube"],
+      "handle": "@englishchannel",
+      "language": "en",
+      "default_format": "long",
+      "voice": "Puck",
+      "voice_style": "Speak like a friendly developer walking a colleague through the steps, calm and clear",
+      "speed": 1.0,
+      "persona": "First person, plain words, short sentences.",
+      "audience": "Founders shipping their first AI-built web app",
+      "topics": ["payments", "deploys", "database migrations"],
+      "cta": "The checklist from this video is linked in the description.",
+      "accent": "",
+      "logo": "",
+      "avoid": [],
+      "captions": false,
+      "music": true
+    }
+  }
+}
