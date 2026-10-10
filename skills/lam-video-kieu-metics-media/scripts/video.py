@@ -11,10 +11,12 @@ Commands:
   tts                           synthesise one piece of narration
   tts-script                    synthesise every scene of script.json and write the timing manifest
   voices                        list speech models available on OpenRouter
+  thumbnail                     generate a cover image in the paper-collage mascot style
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import colorsys
 import hashlib
 import html.parser
@@ -39,6 +41,7 @@ WORK_ROOT = SKILL_DIR / "tmp"
 USER_AGENT = "lam-video-kieu-metics-media/0.1 (+https://github.com/Agoobi/skills-hubs)"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_TTS_MODEL = "google/gemini-3.1-flash-tts-preview"
+DEFAULT_IMAGE_MODEL = "google/gemini-3.1-flash-image"
 FORMATS = {
     "short": {"width": 1080, "height": 1920, "fps": 30, "gap": 0.1, "chapter_hold": 0.0},
     "long": {"width": 1920, "height": 1080, "fps": 30, "gap": 0.2, "chapter_hold": 2.0},
@@ -144,6 +147,7 @@ def cmd_check(args: argparse.Namespace) -> None:
     if not report["openrouter_key"]:
         report["problems"].append("Thiếu OpenRouter API key.")
     report["tts_model"] = settings.get("openrouter", {}).get("tts_model", DEFAULT_TTS_MODEL)
+    report["image_model"] = settings.get("openrouter", {}).get("image_model", DEFAULT_IMAGE_MODEL)
     channels = settings.get("channels", {})
     report["channels"] = list(channels)
     if not channels:
@@ -226,8 +230,8 @@ def cmd_init(args: argparse.Namespace) -> None:
 LIMITS = {
     "youtube": {"title": 100, "description": 5000, "tags_total": 500},
     "youtube-shorts": {"title": 100, "description": 5000},
-    "tiktok": {"caption": 2200, "hashtags": 5},
-    "reels": {"caption": 2200, "hashtags": 5},
+    "tiktok": {"caption": 150, "description": 3500, "post_text": 4000, "description_min": 400, "hashtags": 5},
+    "reels": {"caption": 150, "description": 1900, "post_text": 2200, "hashtags": 5},
     "facebook": {"caption": 2200},
 }
 
@@ -273,7 +277,8 @@ def platform_block(platform: str, project: dict, cfg: dict, chapters: list[dict]
         return {"title": "", "description": "", "hashtags": ["#shorts"], "visibility": "private",
                 "made_for_kids": False}
     if platform in ("tiktok", "reels"):
-        return {"caption": "", "hashtags": [], "cover_time": 0.0}
+        # caption opens the post, description is the long body; `check` joins them into post_text.
+        return {"caption": "", "description": "", "hashtags": [], "post_text": "", "cover_time": 0.0}
     return {"caption": ""}
 
 
@@ -307,7 +312,8 @@ def cmd_metadata(args: argparse.Namespace) -> None:
             "video": {"file": video_path.name, "name": project.get("name", root.name), "channel": alias,
                       "channel_label": cfg.get("label", ""), "handle": cfg.get("handle", ""),
                       "format": project.get("format"), "language": project.get("language"),
-                      "created": project.get("created"), **probe_video(video_path)},
+                      "created": project.get("created"), **probe_video(video_path),
+                      **({"thumbnail": "thumbnail.png"} if (root / "output" / "thumbnail.png").exists() else {})},
             "platforms": {p: platform_block(p, project, cfg, chapters) for p in platforms},
             "sources": [{"file": e.get("file"), "source": e.get("source"), "kind": e.get("kind")} for e in sources],
         }
@@ -343,6 +349,16 @@ def cmd_metadata(args: argparse.Namespace) -> None:
                 for word in avoid:
                     if word and word in value.lower():
                         problems.append(f"{platform}.{field} chứa cụm cần tránh của kênh: '{word}'.")
+        if "post_text" in limits:
+            body = block.get("description", "").strip()
+            if len(body) < limits.get("description_min", 0):
+                problems.append(f"{platform}.description dài {len(body)} ký tự, cần ít nhất {limits['description_min']} "
+                                "(mô tả dài giúp video được tìm thấy; xem metadata.md).")
+            # The single text a person pastes into the platform's description box.
+            block["post_text"] = "\n\n".join(part for part in (block.get("caption", "").strip(), body,
+                                                              " ".join(block.get("hashtags", []))) if part)
+            if len(block["post_text"]) > limits["post_text"]:
+                problems.append(f"{platform}.post_text dài {len(block['post_text'])} ký tự, giới hạn {limits['post_text']}.")
         if "tags" in block and len(",".join(block["tags"])) > limits.get("tags_total", 10 ** 9):
             problems.append(f"{platform}.tags vượt {limits['tags_total']} ký tự.")
         if "hashtags" in block:
@@ -682,6 +698,126 @@ def cmd_voices(args: argparse.Namespace) -> None:
                      ensure_ascii=False, indent=2))
 
 
+# ---------------------------------------------------------------- commands: thumbnail
+
+# House style for cover images, written from the reference the channel owner picked
+# (see references/thumbnail.md). A channel can replace it with `thumbnail_style`.
+THUMBNAIL_STYLE = (
+    "Flat 2D cartoon sticker illustration on a sheet of white graph paper. "
+    "Background: white paper with a fine pale-grey square grid and soft crumple creases across the whole sheet, "
+    "with a solid terracotta-brown vertical band along the left edge and another along the right edge. "
+    "Characters and props: friendly rounded cartoon mascots drawn with bold dark outlines, flat saturated colours "
+    "and only light cel shading, each standing alone as a separate cut-out sticker with empty paper around it. "
+    "No gradients, no photo textures, no 3D rendering, no drop shadows on the paper."
+)
+THUMBNAIL_LAYOUT = {
+    "short": ("9:16", "Vertical 9:16 composition. Stack two sticker groups in the centre column, one in the upper half and "
+                      "one in the lower half, each about half the width of the sheet. Keep the top 12% and the bottom 22% "
+                      "of the sheet empty paper."),
+    "long": ("16:9", "Horizontal 16:9 composition. Place the main sticker group on the left two thirds and a smaller "
+                     "supporting sticker on the right. Keep a clear margin of empty paper on every side."),
+}
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+
+def thumbnail_prompt(cfg: dict, fmt: str, scene: str, title: str, has_reference: bool) -> str:
+    parts = [cfg.get("thumbnail_style") or THUMBNAIL_STYLE, THUMBNAIL_LAYOUT[fmt][1], f"Scene: {scene.strip()}"]
+    if has_reference:
+        parts.append("The attached image is the channel mascot. Draw the same character (same species, colours, clothing "
+                     "and accessories) in the sticker style described above, in the pose the scene asks for.")
+    if title:
+        parts.append(f'The only lettering in the image is the exact text "{title}" in bold condensed capital letters on the '
+                     "sign, board or screen in the scene. Spell it exactly, including every Vietnamese diacritic.")
+    else:
+        parts.append("No lettering, numbers or captions anywhere in the image.")
+    parts.append("Do not draw any real company logo, app icon, brand name, real person or watermark.")
+    return "\n".join(parts)
+
+
+def generate_image(settings: dict, model: str, prompt: str, references: list[Path], aspect: str) -> bytes:
+    openrouter = settings.get("openrouter", {})
+    content: list[dict] = [{"type": "text", "text": prompt}]
+    for ref in references:
+        data = base64.b64encode(ref.read_bytes()).decode("ascii")
+        content.append({"type": "image_url", "image_url": {"url": f"data:{IMAGE_TYPES[ref.suffix.lower()]};base64,{data}"}})
+    payload = {"model": model, "modalities": ["image", "text"], "image_config": {"aspect_ratio": aspect},
+               "messages": [{"role": "user", "content": content}]}
+    last_error = ""
+    for attempt in range(3):
+        status, _, body = http(
+            f"{openrouter.get('base_url', DEFAULT_BASE_URL)}/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {api_key(settings)}", "Content-Type": "application/json",
+                     "X-Title": "lam-video-kieu-metics-media"},
+            body=json.dumps(payload).encode("utf-8"), timeout=300)
+        if status == 200:
+            try:
+                message = json.loads(body)["choices"][0]["message"]
+                url = (message.get("images") or [{}])[0].get("image_url", {}).get("url", "")
+            except (ValueError, KeyError, IndexError):
+                url = ""
+            if url.startswith("data:") and "," in url:
+                return base64.b64decode(url.split(",", 1)[1])
+            last_error = "Model không trả về ảnh."
+        else:
+            last_error = f"HTTP {status}: {body[:300].decode('utf-8', errors='replace')}"
+            if status in (400, 401, 402, 403, 404):
+                die(f"OpenRouter từ chối yêu cầu tạo ảnh. {last_error}")
+        time.sleep(2 * (attempt + 1))
+    die(f"Không tạo được ảnh sau 3 lần thử. {last_error}")
+
+
+def cmd_thumbnail(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    root, project = load_project(args.project)
+    _, cfg = channel(settings, project.get("channel"))
+    fmt = project.get("format", "short")
+    if fmt not in THUMBNAIL_LAYOUT:
+        die(f"Định dạng '{fmt}' không có bố cục ảnh bìa.")
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        die("Cần ffmpeg để đưa ảnh bìa về đúng kích thước.")
+    references = [Path(r) for r in (args.ref or [])]
+    if not references and cfg.get("logo"):
+        logo = Path(cfg["logo"])
+        references = [logo if logo.is_absolute() else SKILL_DIR / logo]
+    for ref in references:
+        if not ref.exists():
+            die(f"Không thấy ảnh tham chiếu: {ref}")
+        if ref.suffix.lower() not in IMAGE_TYPES:
+            die(f"Ảnh tham chiếu phải là PNG, JPG hoặc WebP: {ref.name}")
+    model = args.model or cfg.get("image_model") or settings.get("openrouter", {}).get("image_model", DEFAULT_IMAGE_MODEL)
+    aspect = THUMBNAIL_LAYOUT[fmt][0]
+    prompt = thumbnail_prompt(cfg, fmt, args.scene, (args.title or "").strip(), bool(references))
+    out_dir = root / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    size = FORMATS[fmt]
+    files = []
+    for index in range(1, args.variants + 1):
+        raw = out_dir / f".thumbnail-{index}.raw"
+        raw.write_bytes(generate_image(settings, model, prompt, references, aspect))
+        out = out_dir / (args.out or ("thumbnail.png" if args.variants == 1 else f"thumbnail-{index}.png"))
+        # Models return their own resolution; cover the target frame and crop the overflow.
+        done = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(raw), "-frames:v", "1", "-vf",
+                               f"scale={size['width']}:{size['height']}:force_original_aspect_ratio=increase:flags=lanczos,"
+                               f"crop={size['width']}:{size['height']}", str(out)], capture_output=True, text=True, timeout=120)
+        raw.unlink(missing_ok=True)
+        if done.returncode != 0:
+            die(f"ffmpeg không xử lý được ảnh model trả về: {done.stderr.strip()[:200]}")
+        record(root / "assets" / "ledger.json", {
+            "file": f"output/{out.name}", "kind": "thumbnail-ai", "source": f"OpenRouter {model}", "prompt": prompt,
+            "references": [r.name for r in references], "fetched": time.strftime("%Y-%m-%dT%H:%M:%S")})
+        files.append(str(out))
+    meta_path = out_dir / "metadata.json"
+    if meta_path.exists() and (out_dir / "thumbnail.png").exists():
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        metadata.setdefault("video", {})["thumbnail"] = "thumbnail.png"
+        meta_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"files": files, "model": model, "aspect": aspect, "references": [str(r) for r in references],
+                      "prompt": prompt,
+                      "next": "Mở từng ảnh ra xem: chữ đúng dấu, linh vật đúng, không có logo thật. Sai thì tạo lại."},
+                     ensure_ascii=False, indent=2))
+
+
 # ---------------------------------------------------------------- cli
 
 def main() -> None:
@@ -736,6 +872,16 @@ def main() -> None:
     p.set_defaults(run=cmd_tts_script)
 
     sub.add_parser("voices").set_defaults(run=cmd_voices)
+
+    p = sub.add_parser("thumbnail")
+    p.add_argument("--project", required=True)
+    p.add_argument("--scene", required=True, help="Mô tả cảnh minh hoạ: ai, đang làm gì, với đồ vật nào")
+    p.add_argument("--title", help="Chữ duy nhất trên ảnh, tối đa 4 từ; bỏ trống thì ảnh không có chữ")
+    p.add_argument("--ref", action="append", help="Ảnh tham chiếu linh vật (mặc định: logo của kênh)")
+    p.add_argument("--model")
+    p.add_argument("--variants", type=int, default=1)
+    p.add_argument("--out")
+    p.set_defaults(run=cmd_thumbnail)
 
     args = parser.parse_args()
     args.run(args)

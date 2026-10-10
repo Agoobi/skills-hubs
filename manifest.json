@@ -14,11 +14,11 @@
       "id": "lam-video-kieu-metics-media",
       "path": "skills/lam-video-kieu-metics-media",
       "name": "Bot Video kiểu Metics Media",
-      "summary": "Video hướng dẫn phỏng theo phong cách kênh Metics Media: ngắn/dài, nhiều cổng duyệt, logo và demo thật",
+      "summary": "Video hướng dẫn phỏng theo phong cách kênh Metics Media: ngắn/dài, nhiều cổng duyệt, logo và demo thật, ảnh bìa linh vật",
       "category": "marketing",
       "icon": "clapperboard",
       "tags": ["video", "tutorial", "tiktok", "youtube", "metics-media"],
-      "version": "0.3.0",
+      "version": "0.4.0",
       "agents": ["hermes"],
       "requires": { "toolsets": ["web", "terminal", "browser"], "env": ["OPENROUTER_API_KEY"] },
       "featured": true

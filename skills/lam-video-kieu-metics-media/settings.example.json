@@ -3,6 +3,7 @@
     "api_key": "sk-or-v1-DAN_KEY_OPENROUTER_VAO_DAY",
     "base_url": "https://openrouter.ai/api/v1",
     "tts_model": "google/gemini-3.1-flash-tts-preview",
+    "image_model": "google/gemini-3.1-flash-image",
     "response_format": "pcm"
   },
   "default_channel": "kenh-chinh",
