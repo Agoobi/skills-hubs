@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Khối dựng video hướng dẫn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* Gallery chrome only. Each .stage is a real 1920x1080 frame scaled to fit. */
+  body { margin: 0; padding: 32px; background: #e9e7e3; font-family: "Inter Tight", system-ui, sans-serif; color: #1c1917; }
+  h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  p.note { margin: 0 0 28px; max-width: 900px; color: #57534e; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(2, 960px); gap: 28px; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 8px; font-weight: 700; font-size: 15px; }
+  .frame { width: 960px; height: 540px; overflow: hidden; border-radius: 10px; box-shadow: 0 8px 30px -12px rgba(0,0,0,.35); }
+  .stage { position: relative; width: 1920px; height: 1080px; transform: scale(.5); transform-origin: 0 0; }
+  .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* Marks where a real, downloaded file goes. Not a logo. */
+  .slot { display: grid; place-items: center; width: 100%; height: 100%; border: 3px dashed #a8a29e; border-radius: 12px; font-size: 15px; font-weight: 700; color: #78716c; text-align: center; box-sizing: border-box; }
+  .shot-slot { height: 560px; background: repeating-linear-gradient(135deg, #f5f5f4 0 22px, #ecebe8 22px 44px); display: grid; place-items: center; font-size: 30px; font-weight: 700; color: #78716c; }
+</style>
+</head>
+<body>
+<h1>Khối dựng video hướng dẫn</h1>
+<p class="note">Mỗi khung là 1920×1080 thu nhỏ một nửa. Ô viền nét đứt là chỗ đặt <b>file thật</b> (logo tải từ nguồn chính thức, ảnh hoặc video quay màn hình). Đổi màu bằng cách thay các biến trong <code>tokens.css</code> bằng kết quả của lệnh <code>theme</code>.</p>
+
+<div class="grid">
+  <figure>
+    <figcaption>chapter-card</figcaption>
+    <div class="frame"><div class="stage">
+      <div class="tv-chapter">
+        <div class="tv-chapter-numeral">02</div>
+        <div class="tv-chapter-label">Chương 2 / 6</div>
+        <div class="tv-chapter-title">Kết nối <span class="is-pending">SePay</span></div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>canvas + receipt-card</figcaption>
+    <div class="frame"><div class="stage">
+      <div class="tv-canvas"></div>
+      <div class="center">
+        <div class="tv-card tv-receipt">
+          <div class="tv-card-title">Hoá đơn</div>
+          <div class="tv-receipt-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lead"></span><span>4.500.000đ</span></div>
+          <div class="tv-receipt-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg><span class="lead"></span><span>2.800.000đ</span></div>
+          <div class="tv-receipt-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg><span class="lead"></span><span>3.200.000đ</span></div>
+        </div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>compare-cards</figcaption>
+    <div class="frame"><div class="stage">
+      <div class="tv-canvas"></div>
+      <div class="center">
+        <div class="tv-compare">
+          <div class="tv-card"><div class="tv-compare-name">Pro</div><div class="tv-compare-price">$20 <small>/tháng</small></div><div class="tv-meter"><i style="width:72%"></i></div></div>
+          <div class="tv-card"><div class="tv-compare-name">Max</div><div class="tv-compare-price">$100 <small>/tháng</small></div><div class="tv-meter"><i style="width:100%"></i></div></div>
+        </div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>browser-frame + stat-pill + logo-tile</figcaption>
+    <div class="frame"><div class="stage">
+      <div class="tv-canvas"></div>
+      <div class="center" style="gap:64px">
+        <div class="tv-logo-tile"><div class="slot" style="width:62%;height:62%">LOGO<br>THẬT</div></div>
+        <div style="position:relative;width:1050px">
+          <div class="tv-stat-pill" style="position:absolute;left:-28px;top:-34px;z-index:2">10.000.000đ</div>
+          <div class="tv-browser">
+            <div class="tv-browser-bar"><i></i><i></i><i></i><span></span></div>
+            <div class="shot-slot">ẢNH / VIDEO QUAY MÀN HÌNH THẬT</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>url-pill trên nền quay màn hình</figcaption>
+    <div class="frame"><div class="stage">
+      <div style="position:absolute;inset:0;background:var(--screen-bg)"></div>
+      <div class="center"><div class="shot-slot" style="width:100%;height:100%;background:repeating-linear-gradient(135deg,#1c1c1c 0 22px,#181818 22px 44px);color:#57534e">VIDEO QUAY MÀN HÌNH THẬT, TOÀN KHUNG</div></div>
+      <div class="tv-url-pill"><span style="width:44px;height:44px;display:block"><span class="slot" style="font-size:9px;border-width:2px">LOGO</span></span>my.sepay.vn</div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>statement (thay cho cảnh người nói)</figcaption>
+    <div class="frame"><div class="stage">
+      <div class="tv-canvas"></div>
+      <div class="center"><div class="tv-statement">Dựng xong chưa phải là <em>chạy được.</em></div></div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>lower-third + caption-long</figcaption>
+    <div class="frame"><div class="stage">
+      <div style="position:absolute;inset:0;background:var(--screen-bg)"></div>
+      <div class="tv-lower-third" style="bottom:260px"><span style="width:52px;height:52px;display:block"><span class="slot" style="font-size:9px;border-width:2px">LOGO</span></span><span><b>Khang</b><small>Khang Dev</small></span></div>
+      <div class="tv-caption-long">Bấm vào Webhooks ở cột bên trái.</div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>caption-short (khung dọc dùng cỡ này)</figcaption>
+    <div class="frame"><div class="stage">
+      <div style="position:absolute;inset:0;background:var(--screen-bg)"></div>
+      <div class="center"><div class="tv-caption-short">cộng tiền <span class="is-active">hai lần</span></div></div>
+    </div></div>
+  </figure>
+</div>
+</body>
+</html>

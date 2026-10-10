@@ -11,6 +11,19 @@
   ],
   "skills": [
     {
+      "id": "lam-video-huong-dan",
+      "path": "skills/lam-video-huong-dan",
+      "name": "Bot Video Hướng dẫn",
+      "summary": "Video hướng dẫn ngắn/dài nhiều cổng duyệt, giọng OpenRouter, logo và demo thật",
+      "category": "marketing",
+      "icon": "clapperboard",
+      "tags": ["video", "tutorial", "tiktok", "youtube"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["web", "terminal", "browser"], "env": ["OPENROUTER_API_KEY"] },
+      "featured": true
+    },
+    {
       "id": "viet-bai-facebook-fanpage",
       "path": "skills/viet-bai-facebook-fanpage",
       "name": "Bot Viết bài Fanpage",

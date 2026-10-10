@@ -1,0 +1,4 @@
+settings.json
+tmp/
+.profiles/
+__pycache__/
