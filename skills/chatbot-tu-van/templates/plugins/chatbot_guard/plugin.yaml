@@ -1,0 +1,12 @@
+name: chatbot_guard
+version: 0.1.0
+description: >
+  Rao chan bang code cho chatbot tu van tren kenh webchat va zalo_oa: luon tra tai lieu truoc khi
+  tra loi, chan cau tra loi co gia/%/so dien thoai khong co trong tai lieu, chan khach go lenh /.
+  Cai bang skill chatbot-tu-van (scripts/setup.py).
+author: Agoobi
+hooks:
+  - pre_gateway_dispatch
+  - pre_llm_call
+  - post_tool_call
+  - transform_llm_output

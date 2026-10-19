@@ -35,6 +35,45 @@
       "agents": ["hermes"],
       "requires": { "toolsets": ["web", "terminal"], "env": ["ZERNIO_API_KEY"] },
       "featured": true
+    },
+    {
+      "id": "chatbot-tu-van",
+      "path": "skills/chatbot-tu-van",
+      "name": "Bot Tư vấn khách Web & Zalo",
+      "summary": "Chatbot trả lời khách trên website và Zalo OA chỉ từ tài liệu doanh nghiệp, hội thoại hiện ở Open WebUI",
+      "category": "customer",
+      "icon": "message-circle",
+      "tags": ["chatbot", "website", "zalo-oa", "open-webui"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal"], "env": [] },
+      "featured": false
+    },
+    {
+      "id": "viet-bai-website-wordpress",
+      "path": "skills/viet-bai-website-wordpress",
+      "name": "Bot Viết bài Website",
+      "summary": "Viết bài chuẩn SEO cho WordPress qua Application Password, tạo draft kèm ảnh để duyệt tay",
+      "category": "marketing",
+      "icon": "globe",
+      "tags": ["wordpress", "website", "seo"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal"], "env": [] },
+      "featured": false
+    },
+    {
+      "id": "viet-bai-zalo-oa",
+      "path": "skills/viet-bai-zalo-oa",
+      "name": "Bot Viết bài Zalo OA",
+      "summary": "Viết bài cho Zalo Official Account, tạo bài ở trạng thái ẩn để chủ OA kiểm tra và bật hiển thị",
+      "category": "marketing",
+      "icon": "newspaper",
+      "tags": ["zalo", "zalo-oa", "bai-viet"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal"], "env": ["ZALO_APP_ID", "ZALO_APP_SECRET"] },
+      "featured": false
     }
   ]
 }

@@ -1,0 +1,26 @@
+name: zalo_oa
+label: Zalo OA
+kind: platform
+version: 0.1.0
+description: >
+  Kenh Zalo Official Account: nhan webhook tin nhan, tra loi bang tin tu van (message/cs),
+  chep hoi thoai sang Open WebUI. Cai bang skill chatbot-tu-van (scripts/setup.py).
+author: Agoobi
+requires_env:
+  - name: ZALO_APP_ID
+    description: "App ID tren developers.zalo.me"
+    prompt: "Zalo App ID"
+    password: false
+  - name: ZALO_APP_SECRET
+    description: "Khoa bi mat cua app"
+    prompt: "Zalo App Secret"
+    password: true
+optional_env:
+  - name: ZALO_OA_SECRET_KEY
+    description: "OA Secret Key (muc Webhook cua app) de kiem tra chu ky"
+    prompt: "OA Secret Key"
+    password: true
+  - name: ZALO_OA_ALLOW_ALL_USERS
+    description: "true: moi nguoi nhan tin OA deu duoc bot tra loi"
+    prompt: "Allow all users"
+    password: false

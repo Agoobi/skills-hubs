@@ -1,0 +1,40 @@
+{
+  "business": {
+    "ten": "Shop Mẫu",
+    "hotline": "0901 234 567",
+    "zalo": "0901 234 567",
+    "gio_lam_viec": "8:00 - 21:00 hằng ngày",
+    "website": "https://shopmau.vn"
+  },
+  "fallback_text": "Dạ câu này em chưa có thông tin chính xác. Anh/chị để lại số điện thoại, nhân viên bên em sẽ liên hệ tư vấn ngay ạ.",
+  "guard": {
+    "enabled": true,
+    "platforms": ["webchat", "zalo_oa"],
+    "max_passages": 5
+  },
+  "open_webui": {
+    "url": "https://chat.example.com",
+    "api_key": "sk-DAN_API_KEY_OPEN_WEBUI_CUA_KHACH",
+    "model_label": "Chatbot Shop Mẫu"
+  },
+  "lead_webhook": {
+    "url": "",
+    "secret": ""
+  },
+  "webchat": {
+    "host": "127.0.0.1",
+    "port": 8650,
+    "allowed_origins": ["https://shopmau.vn", "https://www.shopmau.vn"],
+    "title": "Tư vấn Shop Mẫu",
+    "color": "#0f5c8c",
+    "greeting": "Xin chào! Em là trợ lý của Shop Mẫu. Anh/chị cần tư vấn gì ạ?"
+  },
+  "zalo": {
+    "host": "127.0.0.1",
+    "port": 8651,
+    "oa_ids": ["OA_ID_CUA_KHACH"],
+    "oa_secret_key": "OA_SECRET_KEY_TRONG_MUC_WEBHOOK_CUA_APP",
+    "verify_signature": true,
+    "verify_files": {}
+  }
+}

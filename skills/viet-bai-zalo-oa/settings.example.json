@@ -1,0 +1,16 @@
+{
+  "default_oa": "shop",
+  "oas": {
+    "shop": {
+      "label": "Zalo OA Shop Mẫu",
+      "oa_id": "OA_ID_LAY_TU_LENH_oas_SAU_KHI_KET_NOI",
+      "author": "Shop Mẫu",
+      "comment": "show",
+      "brand_voice": "Thân thiện, rõ ràng, xưng 'Shop', gọi 'bạn'.",
+      "audience": "Khách hàng đã quan tâm OA",
+      "default_cta": "Nhắn tin cho OA để được tư vấn ngay.",
+      "avoid": ["cam kết 100%"],
+      "length": "300-600 từ"
+    }
+  }
+}
