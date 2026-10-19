@@ -191,7 +191,10 @@ def cmd_list(a):
 
 
 def cmd_remove(a):
-    f = kdir(home(a.home)) / a.file
+    d = kdir(home(a.home)).resolve()
+    f = (d / a.file).resolve()
+    if f.parent != d or f.suffix != ".md":  # chi xoa file .md nam ngay trong knowledge/
+        die(f"Chi xoa duoc file .md trong {d} (vd: bang-gia.md)")
     if not f.exists():
         die(f"Khong co {a.file}")
     f.unlink()
@@ -280,7 +283,9 @@ def cmd_search(a):
 def record(h, kind, data):
     """Ghi vao leads.jsonl va day qua webhook (ky HMAC) neu co cau hinh."""
     evt = {"type": kind, "time": datetime.now(timezone.utc).isoformat(), **data}
-    with open(h / "leads.jsonl", "a", encoding="utf-8") as f:
+    # SDT khach la du lieu ca nhan: file chi chu so huu doc duoc
+    fd = os.open(h / "leads.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(json.dumps(evt, ensure_ascii=False) + "\n")
     hook = settings(h).get("lead_webhook") or {}
     if not hook.get("url"):
@@ -294,7 +299,7 @@ def record(h, kind, data):
     try:
         with urllib.request.urlopen(urllib.request.Request(hook["url"], body, headers, method="POST"), timeout=15) as r:
             return {"saved": True, "webhook": r.status}
-    except (urllib.error.URLError, OSError) as e:
+    except (urllib.error.URLError, OSError, ValueError) as e:  # ValueError: URL webhook sai dinh dang
         return {"saved": True, "webhook": f"loi: {e}"}
 
 

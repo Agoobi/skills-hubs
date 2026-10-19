@@ -33,10 +33,24 @@ def die(msg, code=1, **extra):
     sys.exit(code)
 
 
+def article_id(v):
+    # id bai Zalo chi gom chu/so; chan ky tu nhu ../ vi id dung lam ten file drafts/<alias>-<id>.json
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", v):
+        raise argparse.ArgumentTypeError("id bai khong hop le")
+    return v
+
+
 def load():
     if not SETTINGS.exists():
         die(f"Chua co {SETTINGS}. Copy settings.example.json -> settings.json roi dien OA.")
-    return json.loads(SETTINGS.read_text(encoding="utf-8"))
+    try:
+        os.chmod(SETTINGS, 0o600)
+    except OSError:
+        pass
+    try:
+        return json.loads(SETTINGS.read_text(encoding="utf-8"))
+    except ValueError as e:
+        die(f"{SETTINGS} khong phai JSON hop le: {e}")
 
 
 def oa_of(cfg, alias):
@@ -337,7 +351,7 @@ def main():
     art_args(p)
     p.set_defaults(f=cmd_draft)
     p = sp.add_parser("update", help="Sua bai dang an da tao bang skill")
-    p.add_argument("id")
+    p.add_argument("id", type=article_id)
     art_args(p)
     p.set_defaults(f=cmd_update)
     p = oa_arg(sp.add_parser("list"))
@@ -345,7 +359,7 @@ def main():
     p.add_argument("--limit", type=int, default=10)
     p.set_defaults(f=cmd_list)
     p = oa_arg(sp.add_parser("detail"))
-    p.add_argument("id")
+    p.add_argument("id", type=article_id)
     p.set_defaults(f=cmd_detail)
     a = ap.parse_args()
     a.f(a)

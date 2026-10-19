@@ -64,6 +64,7 @@
       .then(function (r) { return r.json(); })
       .then(function (j) {
         polling = false;
+        if (typeof j.last === "number" && j.last < state.last) state.last = 0; // may chu khoi dong lai: dem lai tu dau
         (j.messages || []).forEach(function (m) { add("bot", m.text, true); state.last = Math.max(state.last, m.seq); });
         save();
         typing = !!j.typing; typingEl.style.display = typing ? "block" : "none";
@@ -85,7 +86,10 @@
       .then(function (r) {
         if (r.status === 429) add("bot", "Anh/chị gửi hơi nhanh, vui lòng thử lại sau ít phút ạ.", false);
         else if (!r.ok) add("bot", "Xin lỗi, hệ thống đang bận. Anh/chị thử lại giúp em ạ.", false);
-        else { typing = true; typingEl.style.display = "block"; poll(); }
+        else return r.json().then(function (j) {
+          if (j.seq && j.seq <= state.last) { state.last = j.seq; save(); } // phien moi tren may chu
+          typing = true; typingEl.style.display = "block"; poll();
+        });
       })
       .catch(function () { add("bot", "Không kết nối được. Anh/chị kiểm tra mạng giúp em ạ.", false); });
   };

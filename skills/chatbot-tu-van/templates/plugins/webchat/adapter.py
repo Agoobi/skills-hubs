@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -29,6 +30,18 @@ except ImportError:  # setup.py chua chep file
 
 logger = logging.getLogger(__name__)
 
+
+def guard_text(platform: str, user_id: str, text: str) -> str:
+    """Lop chan cuoi cua chatbot_guard truoc khi gui khach (ca tin trung gian). Guard loi -> gui cau mau."""
+    g = sys.modules.get("hermes_plugins.chatbot_guard")
+    if g is None or not hasattr(g, "outgoing"):
+        return text  # plugin guard khong bat: check.py se bao
+    try:
+        return g.outgoing(platform, user_id, text)
+    except Exception:
+        logger.exception("[%s] guard loi, gui cau mau", platform)
+        return getattr(g, "DEFAULT_FALLBACK", "Dạ anh/chị để lại số điện thoại, nhân viên sẽ liên hệ ạ.")
+
 PLATFORM = "webchat"
 VID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 MAX_TEXT = 1000
@@ -36,6 +49,7 @@ MAX_BODY = 8 * 1024
 POLL_SECONDS = 25
 RATE = (20, 300)  # toi da 20 tin / 5 phut / vid
 RATE_IP = (60, 300)  # / IP (nhieu khach chung mang van du)
+RATE_POLL = (600, 300)  # long-poll / IP (moi tab ~1 lan / 25 giay)
 IDLE_DROP = 6 * 3600  # bo trang thai cua vid khong hoat dong qua 6 gio
 
 
@@ -63,12 +77,13 @@ class WebchatAdapter(BasePlatformAdapter):
         self.origins = set(self.cfg.get("allowed_origins") or [])
         self.mirror = Mirror(chatbot_home(), s.get("open_webui") or {}) if Mirror else None
         self._outbox: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
-        self._seq: Dict[str, int] = defaultdict(int)
+        # seq bat dau tu thoi diem tao: sau khi khoi dong lai / don dep, seq moi luon lon hon seq cu cua trinh duyet
+        self._seq: Dict[str, int] = defaultdict(lambda: int(time.time()) * 1000)
         self._typing: Dict[str, float] = {}
-        self._waiters: Dict[str, asyncio.Event] = defaultdict(asyncio.Event)
+        self._waiters: Dict[str, asyncio.Event] = {}
         self._hits: Dict[str, deque] = defaultdict(deque)
         self._last: Dict[str, float] = {}
-        self._mirror_tasks: Dict[str, asyncio.Task] = {}
+        self._mirror_tasks: Dict[str, Any] = {}
         self._gc_at = time.time()
         self._runner = None
 
@@ -109,21 +124,29 @@ class WebchatAdapter(BasePlatformAdapter):
         vid = chat_id.removeprefix("web-")
         if not chat_id.startswith("web-") or not VID_RE.match(vid):  # vd kenh nha "none" cua cron
             return SendResult(success=False, error=f"webchat: chat_id khong hop le {chat_id!r}")
+        content = guard_text(PLATFORM, chat_id, content)
+        self._last[vid] = time.time()
         prev = self._mirror_tasks.get(vid)
         if prev and not prev.done():  # chep tin khach truoc, giu dung thu tu ben Open WebUI
             await asyncio.wait([prev], timeout=20)
         self._seq[vid] += 1
         self._outbox[vid].append({"seq": self._seq[vid], "role": "bot", "text": content, "time": int(time.time())})
         self._typing.pop(vid, None)
-        self._waiters[vid].set()
+        self._wake(vid)
         if self.mirror:
-            await asyncio.to_thread(self.mirror.add, f"web:{vid}", f"Web · khách {vid[:6]}", "assistant", content)
+            self.mirror.add_async(f"web:{vid}", f"Web · khách {vid[:6]}", "assistant", content)
         return SendResult(success=True, message_id=f"{vid}:{self._seq[vid]}")
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         vid = chat_id.removeprefix("web-")
-        self._typing[vid] = time.time()
-        self._waiters[vid].set()
+        if vid in self._last:
+            self._typing[vid] = time.time()
+            self._wake(vid)
+
+    def _wake(self, vid):
+        ev = self._waiters.get(vid)
+        if ev:
+            ev.set()
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
         return {"name": chat_id, "type": "dm"}
@@ -181,7 +204,7 @@ class WebchatAdapter(BasePlatformAdapter):
         for vid in [v for v, t in self._last.items() if now - t > IDLE_DROP]:
             for d in (self._last, self._outbox, self._seq, self._typing, self._waiters, self._hits, self._mirror_tasks):
                 d.pop(vid, None)
-        for k in [k for k, q in self._hits.items() if not q or q[-1] < now - RATE_IP[1]]:
+        for k in [k for k, q in self._hits.items() if not q or q[-1] < now - RATE_POLL[1]]:
             self._hits.pop(k, None)
 
     async def _chat(self, request):
@@ -206,8 +229,7 @@ class WebchatAdapter(BasePlatformAdapter):
         seq = self._seq[vid]
         self._outbox[vid].append({"seq": seq, "role": "user", "text": text, "time": int(time.time())})
         if self.mirror:
-            self._mirror_tasks[vid] = asyncio.create_task(
-                asyncio.to_thread(self.mirror.add, f"web:{vid}", f"Web · khách {vid[:6]}", "user", text))
+            self._mirror_tasks[vid] = self.mirror.add_async(f"web:{vid}", f"Web · khách {vid[:6]}", "user", text)
         source = self.build_source(chat_id=f"web-{vid}", chat_name=f"Web {vid[:6]}", chat_type="dm",
                                    user_id=f"web-{vid}", user_name=f"Khách web {vid[:6]}")
         event = MessageEvent(text=text, message_type=MessageType.TEXT, source=source,
@@ -224,6 +246,10 @@ class WebchatAdapter(BasePlatformAdapter):
         vid = request.query.get("vid", "")
         if not VID_RE.match(vid):
             return self._cors(request, web.json_response({"ok": False, "error": "vid"}, status=400))
+        if not self._rate_ok("poll:" + self._client_ip(request), RATE_POLL):
+            return self._cors(request, web.json_response({"ok": False, "error": "rate"}, status=429))
+        if vid not in self._last:  # vid chua tung chat (hoac da don dep): khong giu ket noi, khong tao trang thai
+            return self._cors(request, web.json_response({"ok": True, "messages": [], "last": 0, "typing": False}))
         try:
             after = int(request.query.get("after", "0"))
         except ValueError:
@@ -239,7 +265,7 @@ class WebchatAdapter(BasePlatformAdapter):
         client_typing = request.query.get("typing") == "1"
         deadline = time.time() + POLL_SECONDS
         while not pending() and is_typing() == client_typing and time.time() < deadline:
-            ev = self._waiters[vid]
+            ev = self._waiters.setdefault(vid, asyncio.Event())
             ev.clear()
             try:
                 await asyncio.wait_for(ev.wait(), timeout=min(5, max(0.1, deadline - time.time())))

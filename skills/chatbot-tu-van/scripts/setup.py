@@ -7,6 +7,7 @@ Viec lam:
 1. Tao $HERMES_HOME/chatbot/ (settings.json tu mau, knowledge/, kb.py cho MCP).
 2. Chep 3 plugin vao $HERMES_HOME/plugins/: webchat, zalo_oa, chatbot_guard (kem file dung chung).
 3. Ghi config.yaml cua profile: plugins.enabled, mcp_servers.kb (chi tool tra tai lieu/lead),
+   display.platforms (tat tin trung gian / tien trinh tool tren kenh chat),
    platform_toolsets cho webchat/zalo_oa = chi MCP server "kb" (KHONG terminal, file, web).
 4. Ghi .env cua profile: CHATBOT_HOME, *_ALLOW_ALL_USERS, ZALO_APP_ID/SECRET neu truyen vao.
 Sau do: khoi dong lai gateway cua profile va chay scripts/check.py.
@@ -25,6 +26,9 @@ PLUGINS = {  # plugin -> file dung chung can chep kem
 }
 CHAT_PLATFORMS = ["webchat", "zalo_oa"]
 KB_TOOLS = ["tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"]
+QUIET = {"tool_progress": "off", "interim_assistant_messages": False, "long_running_notifications": False,
+         "busy_ack_detail": False, "busy_steer_ack_enabled": False, "show_reasoning": False,
+         "streaming": False, "live_status": "off", "thinking_progress": False}
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -84,6 +88,7 @@ def main():
     # 1. thu muc du lieu
     if not a.dry_run:
         (chat / "knowledge").mkdir(parents=True, exist_ok=True)
+        os.chmod(chat, 0o700)  # co lead (SDT khach), token, settings
         if not (chat / "settings.json").exists():
             shutil.copy(SKILL / "settings.example.json", chat / "settings.json")
             os.chmod(chat / "settings.json", 0o600)
@@ -116,6 +121,10 @@ def main():
         "tools": {"include": KB_TOOLS, "prompts": False, "resources": False},
     }
     cfg.setdefault("onboarding", {})["profile_build"] = "off"  # khong de bot hoi khach de "tao ho so"
+    # Kenh chat chi gui CAU TRA LOI CUOI (da qua chatbot_guard): tat tin trung gian, tien trinh tool, suy nghi...
+    dp = cfg.setdefault("display", {}).setdefault("platforms", {})
+    for p in CHAT_PLATFORMS:
+        dp.setdefault(p, {}).update(QUIET)
     pt = cfg.setdefault("platform_toolsets", {})
     for p in CHAT_PLATFORMS:
         pt[p] = ["kb"]  # ten MCP server = allowlist; khong co toolset nao khac
@@ -123,7 +132,8 @@ def main():
         if cfg_file.exists():
             shutil.copy(cfg_file, cfg_file.with_suffix(".yaml.bak-chatbot"))
         cfg_file.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
-    done.append("config.yaml: plugins.enabled, mcp_servers.kb, platform_toolsets (webchat/zalo_oa = chi MCP kb)")
+    done.append("config.yaml: plugins.enabled, mcp_servers.kb, platform_toolsets (webchat/zalo_oa = chi MCP kb), "
+                "display.platforms (chi gui cau tra loi cuoi)")
 
     # 4. .env
     env = {"CHATBOT_HOME": str(chat), "WEBCHAT_ALLOW_ALL_USERS": "true", "ZALO_OA_ALLOW_ALL_USERS": "true",

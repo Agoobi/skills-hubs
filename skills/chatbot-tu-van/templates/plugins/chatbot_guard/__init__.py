@@ -25,20 +25,26 @@ DEFAULT_PLATFORMS = {"webchat", "zalo_oa"}
 DEFAULT_FALLBACK = ("Dạ câu này em chưa có thông tin chính xác. Anh/chị để lại số điện thoại, "
                     "nhân viên bên em sẽ liên hệ tư vấn ngay ạ.")
 _lock = threading.Lock()
-_turns: dict = {}  # session_id -> {"evidence": [...], "user": str, "t": float}
+_turns: dict = {}  # session_id -> {"evidence": [...], "user": str, "t": float, "platform", "sender"}
+_by_user: dict = {}  # (platform, sender_id) -> session_id, cho outgoing()
 _index = None
 
-MONEY = re.compile(r"(\d[\d.,]*)\s*(tỷ|tỉ|triệu|tr|nghìn|ngàn|k|đồng|đ|vnđ|vnd)(?![a-zà-ỹ])", re.I)
-PERCENT = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
+MONEY = re.compile(r"(\d[\d.,]*)\s*(tỷ|tỉ|triệu|tr|nghìn|ngàn|k|đồng|đ|vnđ|vnd|₫)(?![a-zà-ỹ])", re.I)
+PERCENT = re.compile(r"(\d+(?:[.,]\d+)?)\s*(%|phần trăm)", re.I)
 PHONE = re.compile(r"(?<!\d)(?:\+?84|0)(?:[\s.\-]?\d){8,10}(?!\d)")
+GROUPED = re.compile(r"(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d.,]*\d)")  # 99.000 / 1.200.000: gia khong don vi
 NUMBER = re.compile(r"\d[\d.,]*")
-LONGNUM = re.compile(r"(?<![\d.,])\d(?:[\d.\- ]*\d)?(?![\d])")  # so tai khoan, ma, gia khong don vi
+LONGNUM = re.compile(r"(?<![\d.,])\d(?:[\d.\- ]*\d)?(?![\d])")  # so tai khoan, ma don
 KB_TOOL = re.compile(r"^mcp_+kb_+")  # Hermes dat ten tool MCP: mcp__kb__tim_kien_thuc
 UNITS = {"tỷ": 1e9, "tỉ": 1e9, "triệu": 1e6, "tr": 1e6, "nghìn": 1e3, "ngàn": 1e3, "k": 1e3}
 
 
 def _settings():
-    return kb.settings(kb.home())
+    try:
+        return kb.settings(kb.home())
+    except Exception as e:  # settings.json dang sua do / hong: dung mac dinh, KHONG bo qua kiem tra
+        logger.warning("[chatbot_guard] doc settings.json loi, dung mac dinh: %s", e)
+        return {}
 
 
 def _platform(value) -> str:
@@ -62,70 +68,71 @@ def _idx():
 
 # ---------------------------------------------------------------- so lieu
 
-def _num_values(raw: str):
-    """'1.500.000' -> {1500000}; '1,5' -> {1.5, 15}; '2.5' -> {2.5, 25}"""
-    vals = set()
-    digits = re.sub(r"[.,]", "", raw)
-    if digits.isdigit():
-        vals.add(float(digits))
-    for sep in ".,":
-        if raw.count(sep) == 1:
-            try:
-                vals.add(float(raw.replace(",", ".") if sep == "," else raw.replace(",", "")))
-            except ValueError:
-                pass
-    return vals
+def _num(raw: str):
+    """'1.500.000' / '1,500,000' -> 1500000; '1,5' / '2.5' -> so thap phan; '1200000' -> 1200000."""
+    raw = raw.strip(".,")
+    if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
+        return float(re.sub(r"[.,]", "", raw))
+    if re.fullmatch(r"\d+[.,]\d+", raw):
+        return float(raw.replace(",", "."))
+    digits = re.sub(r"\D", "", raw)
+    return float(digits) if digits else None
 
 
-def _money_values(text: str):
-    vals = set()
+def _key(v):
+    return round(v, 2)
+
+
+def _money(text: str):
+    """[(chuoi, gia tri VND)] cho so co don vi tien va so dang 99.000 khong don vi."""
+    res, spans = [], []
     for m in MONEY.finditer(text):
-        mult = UNITS.get(m.group(2).lower(), 1)
-        vals |= {v * mult for v in _num_values(m.group(1))}
-    return vals
+        v = _num(m.group(1))
+        if v is not None:
+            res.append((m.group(0), _key(v * UNITS.get(m.group(2).lower(), 1))))
+            spans.append(m.span())
+    for m in GROUPED.finditer(text):
+        if not any(a <= m.start() < b for a, b in spans):
+            res.append((m.group(0), _key(_num(m.group(0)))))
+            spans.append(m.span())
+    return res, spans
 
 
 def _phones(text: str):
-    return {re.sub(r"\D", "", p).removeprefix("84") for p in PHONE.findall(text)}
-
-
-def facts(text: str):
-    """Cac con so 'nguy hiem' trong cau tra loi: tien, %, so dien thoai."""
-    out = []
-    for m in MONEY.finditer(text):
-        mult = UNITS.get(m.group(2).lower(), 1)
-        out.append(("money", m.group(0), {v * mult for v in _num_values(m.group(1))}))
-    for m in PERCENT.finditer(text):
-        out.append(("percent", m.group(0), _num_values(m.group(1))))
-    phones = PHONE.findall(text)
-    for p in phones:
-        out.append(("phone", p, {re.sub(r"\D", "", p).removeprefix("84").lstrip("0")}))
-    seen = {re.sub(r"\D", "", p) for p in phones} | {re.sub(r"\D", "", f[1]) for f in out if f[0] == "money"}
-    for m in LONGNUM.finditer(text):
-        d = re.sub(r"\D", "", m.group(0))
-        if len(d) >= 6 and d not in seen and not any(d in x for x in seen):
-            out.append(("long", m.group(0).strip(), {d}))
-    return out
-
-
-def supported(fact, evidence: str) -> bool:
-    kind, raw, vals = fact
-    if kind == "phone":
-        return any(v and v in {x.lstrip("0") for x in _phones(evidence)} for v in vals)
-    if kind == "long":
-        digits = {re.sub(r"\D", "", m.group(0)) for m in LONGNUM.finditer(evidence)}
-        return bool(vals & digits)
-    ev_vals = _money_values(evidence) if kind == "money" else set()
-    for m in NUMBER.finditer(evidence):
-        ev_vals |= _num_values(m.group(0))
-    return bool(vals & ev_vals)
+    return {re.sub(r"\D", "", p).removeprefix("84").lstrip("0") for p in PHONE.findall(text)}
 
 
 def check(response: str, evidence: str, user_text: str = ""):
-    """Tra ve danh sach so lieu khong co can cu. Cau cua khach chi lam can cu cho SDT
-    (bot nhac lai SDT khach vua cho); gia/% khach tu noi ("giam 50% dung khong?") thi KHONG tinh."""
-    return [f[1] for f in facts(response)
-            if not supported(f, evidence + ("\n" + user_text if f[0] == "phone" else ""))]
+    """Danh sach so lieu trong cau tra loi KHONG co can cu.
+    - tien: gia tri (da quy doi don vi) phai co trong tai lieu (so co don vi, so 99.000, hoac so tron nhu o Excel)
+    - %: chi so voi % trong tai lieu ("30 ngay" khong lam can cu cho "30%")
+    - SDT: co trong tai lieu / lien he / cau khach vua gui (bot nhac lai SDT khach)
+    - so dai >= 6 chu so (tai khoan, ma): phai co nguyen chuoi so trong tai lieu
+    Gia/% khach tu noi ("giam 50% dung khong?") KHONG tinh la can cu."""
+    bad = []
+    ev_money = {v for _, v in _money(evidence)[0]}
+    ev_money |= {_key(v) for v in (_num(m.group(0)) for m in NUMBER.finditer(evidence)) if v is not None}
+    money, spans = _money(response)
+    bad += [raw for raw, v in money if v not in ev_money]
+
+    ev_pct = {_key(_num(m.group(1))) for m in PERCENT.finditer(evidence)}
+    for m in PERCENT.finditer(response):
+        spans.append(m.span())
+        if _key(_num(m.group(1))) not in ev_pct:
+            bad.append(m.group(0))
+
+    ok_phones = _phones(evidence) | _phones(user_text)
+    for m in PHONE.finditer(response):
+        spans.append(m.span())
+        if re.sub(r"\D", "", m.group(0)).removeprefix("84").lstrip("0") not in ok_phones:
+            bad.append(m.group(0))
+
+    ev_digits = {re.sub(r"\D", "", m.group(0)) for m in LONGNUM.finditer(evidence)}
+    for m in LONGNUM.finditer(response):
+        d = re.sub(r"\D", "", m.group(0))
+        if len(d) >= 6 and not any(a <= m.start() < b for a, b in spans) and d not in ev_digits:
+            bad.append(m.group(0).strip())
+    return bad
 
 
 # ---------------------------------------------------------------- hooks
@@ -161,8 +168,11 @@ def on_pre_llm(session_id=None, user_message=None, conversation_history=None, pl
     with _lock:
         _turns[session_id] = {"evidence": [], "user": user_message or "", "t": time.time(),
                               "platform": _platform(platform), "sender": sender_id}
+        _by_user[(_platform(platform), str(sender_id))] = session_id
         for k in [k for k, v in _turns.items() if time.time() - v["t"] > 3600]:
             _turns.pop(k, None)
+        for k in [k for k, v in _by_user.items() if v not in _turns]:
+            _by_user.pop(k, None)
     if not _enabled():
         return None
     head = rules(_platform(platform))
@@ -202,29 +212,55 @@ def on_tool(tool_name=None, args=None, result=None, session_id=None, **_):
 def _record_safe(kind, data):
     try:
         kb.record(kb.home(), kind, data)
-    except OSError as e:
+    except Exception as e:
         logger.warning("[chatbot_guard] khong ghi duoc su kien %s: %s", kind, e)
 
 
-def on_output(response_text=None, session_id=None, platform=None, **_):
-    if _platform(platform) not in _platforms() or not _enabled() or not response_text:
-        return None
-    s = _settings()
-    with _lock:
-        turn = dict(_turns.get(session_id) or {})
+def _evidence(turn, s):
     biz = " ".join(str(v) for v in (s.get("business") or {}).values())
-    evidence = "\n".join(turn.get("evidence") or []) + "\n" + biz
-    bad = check(response_text, evidence, turn.get("user", ""))
+    return "\n".join(turn.get("evidence") or []) + "\n" + biz
+
+
+def _filter(text, turn, platform, session_id, where):
+    """Tra ve None neu text an toan, nguoc lai cau thay the. Loi bat ky -> CHAN (fail closed)."""
+    s = {}
+    try:
+        s = _settings()
+        if not (s.get("guard") or {}).get("enabled", True):
+            return None
+        bad = check(text, _evidence(turn, s), turn.get("user", ""))
+    except Exception as e:
+        logger.exception("[chatbot_guard] loi khi kiem tra, chan cau tra loi: %s", e)
+        bad = ["(loi kiem tra)"]
     if not bad:
         return None
-    logger.warning("[chatbot_guard] chan cau tra loi (so lieu khong co trong tai lieu: %s)", bad)
-    try:
-        kb.record(kb.home(), "guard_blocked", {"session": session_id, "platform": _platform(platform),
-                                                "khach_hoi": turn.get("user", ""), "bot_dinh_tra_loi": response_text,
-                                                "so_lieu_khong_co_can_cu": bad})
-    except OSError as e:
-        logger.warning("[chatbot_guard] khong ghi duoc su kien: %s", e)
+    logger.warning("[chatbot_guard] chan %s (so lieu khong co trong tai lieu: %s)", where, bad)
+    evt = {"session": session_id, "platform": platform, "noi_chan": where, "khach_hoi": turn.get("user", ""),
+           "bot_dinh_tra_loi": text, "so_lieu_khong_co_can_cu": bad}
+    threading.Thread(target=_record_safe, args=("guard_blocked", evt), daemon=True).start()
     return s.get("fallback_text") or DEFAULT_FALLBACK
+
+
+def on_output(response_text=None, session_id=None, platform=None, **_):
+    plat = _platform(platform)
+    try:
+        watched = plat in _platforms()
+    except Exception:
+        watched = plat in DEFAULT_PLATFORMS
+    if not watched or not response_text:
+        return None
+    with _lock:
+        turn = dict(_turns.get(session_id) or {})
+    return _filter(response_text, turn, plat, session_id, "cau_tra_loi")
+
+
+def outgoing(platform: str, user_id: str, text: str) -> str:
+    """Lop chan cuoi, adapter goi ngay truoc khi gui cho khach (ca tin trung gian neu Hermes co gui).
+    Tra ve text duoc phep gui (nguyen van hoac cau thay the)."""
+    with _lock:
+        sid = _by_user.get((platform, str(user_id)))
+        turn = dict(_turns.get(sid) or {})
+    return _filter(text, turn, platform, sid, "truoc_khi_gui") or text
 
 
 def register(ctx) -> None:

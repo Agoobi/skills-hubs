@@ -36,10 +36,20 @@ def app_credentials(app_id=None, secret=None):
     return app_id, secret
 
 
+def _write_private(path: Path, text: str):
+    """Ghi file bi mat: tao voi quyen 600 ngay tu dau roi doi ten (khong co luc nao file lo ra)."""
+    tmp = path.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.chmod(tmp, 0o600)
+    tmp.replace(path)
+
+
 class _Locked:
     def __enter__(self):
         f = token_file()
-        f.parent.mkdir(parents=True, exist_ok=True)
+        f.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.lock = open(f.with_suffix(".lock"), "w")
         fcntl.flock(self.lock, fcntl.LOCK_EX)
         self.data = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"oas": {}}
@@ -48,10 +58,7 @@ class _Locked:
 
     def save(self):
         f = token_file()
-        tmp = f.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.chmod(tmp, 0o600)
-        tmp.replace(f)
+        _write_private(f, json.dumps(self.data, ensure_ascii=False, indent=2))
 
     def __exit__(self, *exc):
         fcntl.flock(self.lock, fcntl.LOCK_UN)
@@ -143,8 +150,7 @@ def auth_url(redirect_uri, app_id=None):
         pending = json.loads(f.read_text()) if f.exists() else {}
         pending = {k: v for k, v in pending.items() if v["t"] > time.time() - 1800}
         pending[state] = {"verifier": verifier, "redirect": redirect_uri, "t": time.time()}
-        f.write_text(json.dumps(pending))
-        os.chmod(f, 0o600)
+        _write_private(f, json.dumps(pending))
     q = urllib.parse.urlencode({"app_id": app_id, "redirect_uri": redirect_uri,
                                 "code_challenge": challenge, "state": state})
     return {"url": f"{OAUTH}/permission?{q}", "state": state, "redirect_uri": redirect_uri}
@@ -160,7 +166,7 @@ def complete(query, name=None):
         f = _pending_file()
         pending = json.loads(f.read_text()) if f.exists() else {}
         item = pending.pop(state, None)
-        f.write_text(json.dumps(pending))
+        _write_private(f, json.dumps(pending))
     if not item:
         raise ZaloAuthError("state khong khop hoac da qua 30 phut: tao link moi bang auth-url.")
     return exchange_code(oa_id, code, item["verifier"], name=name)

@@ -92,6 +92,18 @@ def check_install(home, cfg):
     add("platform_toolsets", not bad, f"khac ['kb']: {bad}" if bad else "webchat, zalo_oa = ['kb']",
         "Dat platform_toolsets.webchat/zalo_oa = [kb] (setup.py lam san)")
 
+    try:
+        from gateway.display_config import resolve_display_setting
+    except ImportError:
+        pass
+    else:
+        for p in ("webchat", "zalo_oa"):
+            loud = {k: resolve_display_setting(cfg, p, k) for k in ("tool_progress", "interim_assistant_messages",
+                                                                   "long_running_notifications", "streaming")}
+            bad = {k: v for k, v in loud.items() if v not in ("off", False, None)}
+            add(f"chi gui cau tra loi cuoi ({p})", not bad, f"dang bat: {bad}" if bad else "tat tin trung gian",
+                "Chay lai setup.py (ghi display.platforms) roi restart gateway")
+
     # toolset thuc te (chi khi chay bang python cua Hermes)
     try:
         from hermes_cli.tools_config import _get_platform_tools

@@ -35,7 +35,14 @@ def die(msg, code=1, **extra):
 def load():
     if not SETTINGS.exists():
         die(f"Chua co {SETTINGS}. Copy settings.example.json -> settings.json roi dien site.")
-    return json.loads(SETTINGS.read_text(encoding="utf-8"))
+    try:
+        os.chmod(SETTINGS, 0o600)  # co the chua app password
+    except OSError:
+        pass
+    try:
+        return json.loads(SETTINGS.read_text(encoding="utf-8"))
+    except ValueError as e:
+        die(f"{SETTINGS} khong phai JSON hop le: {e}")
 
 
 def env_key(alias):
@@ -96,7 +103,10 @@ def request(s, method, route, params=None, body=None, raw=None, headers=None, au
             ctype = r.headers.get("Content-Type", "")
             if "json" not in ctype:
                 raise WPError(r.status, "not_json", f"Khong phai JSON ({ctype or 'khong ro'}): {txt[:120]!r}")
-            return json.loads(txt) if txt else {}, r.headers
+            try:
+                return json.loads(txt) if txt else {}, r.headers
+            except ValueError:
+                raise WPError(r.status, "not_json", f"JSON hong: {txt[:120]!r}")
     except urllib.error.HTTPError as e:
         raw_body = e.read().decode(errors="replace")
         try:
@@ -106,6 +116,16 @@ def request(s, method, route, params=None, body=None, raw=None, headers=None, au
             raise WPError(e.code, "http", raw_body[:300])
     except urllib.error.URLError as e:
         raise WPError(0, "network", str(e.reason))
+    except (TimeoutError, OSError) as e:  # het thoi gian doc, mat ket noi giua chung
+        raise WPError(0, "network", f"{type(e).__name__}: {e}")
+
+
+def _wp_json_ok(s):
+    try:
+        request(s, "GET", "/", auth=False)
+        return True
+    except WPError:
+        return False
 
 
 def api(s, method, route, **kw):
@@ -116,6 +136,10 @@ def api(s, method, route, **kw):
         except WPError as e:
             # /wp-json tra trang HTML (permalink Plain, rewrite tat): thu ?rest_route=. Loi JSON cua WP thi giu nguyen.
             if not s.get("_rest_route") and e.code in ("not_json", "http") and e.status in (200, 404):
+                # Lenh ghi (POST) chi thu lai khi chac /wp-json khong phai REST (GET thu cung tra HTML),
+                # tranh tao bai 2 lan khi loi la do firewall/cache sau khi WP da ghi.
+                if method != "GET" and _wp_json_ok(s):
+                    raise
                 s["_rest_route"] = True
                 return request(s, method, route, **kw)[0]
             raise
@@ -454,9 +478,13 @@ def cmd_update(a):
     body, extra = build_body(s, a, creating=False)
     if not body:
         die("Khong co gi de sua (dung --title/--content-file/--excerpt/--categories/--tags/--featured/--slug).")
-    body["status"] = post["status"] if post["status"] != "auto-draft" else "draft"
+    if post["status"] == "auto-draft":
+        body["status"] = "draft"  # khong gui status cho bai khac: khong bao gio doi trang thai bai dang co
     post = api(s, "POST", f"/wp/v2/posts/{a.id}", body=body)
-    out(summary(s, post, {**extra, "changed": sorted(k for k in body if k != "status")}))
+    warn = {}
+    if post.get("status") not in EDITABLE:  # ai do vua dang bai giua luc doc va luc sua
+        warn = {"warning": f"Bai hien dang '{post.get('status')}' tren WordPress. Bao user kiem tra lai."}
+    out(summary(s, post, {**extra, **warn, "changed": sorted(k for k in body if k != "status")}))
 
 
 def cmd_status(a):

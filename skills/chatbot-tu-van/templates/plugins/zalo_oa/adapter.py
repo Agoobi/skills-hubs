@@ -15,6 +15,7 @@ import hmac
 import json
 import logging
 import os
+import sys
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -32,6 +33,18 @@ except ImportError:
     Mirror = None
 
 logger = logging.getLogger(__name__)
+
+
+def guard_text(platform: str, user_id: str, text: str) -> str:
+    """Lop chan cuoi cua chatbot_guard truoc khi gui khach (ca tin trung gian). Guard loi -> gui cau mau."""
+    g = sys.modules.get("hermes_plugins.chatbot_guard")
+    if g is None or not hasattr(g, "outgoing"):
+        return text  # plugin guard khong bat: check.py se bao
+    try:
+        return g.outgoing(platform, user_id, text)
+    except Exception:
+        logger.exception("[%s] guard loi, gui cau mau", platform)
+        return getattr(g, "DEFAULT_FALLBACK", "Dạ anh/chị để lại số điện thoại, nhân viên sẽ liên hệ ạ.")
 
 PLATFORM = "zalo_oa"
 API = os.getenv("ZALO_API_BASE") or "https://openapi.zalo.me/v3.0/oa"  # env de test voi API gia lap
@@ -76,6 +89,7 @@ class ZaloOAAdapter(BasePlatformAdapter):
         self.mirror = Mirror(chatbot_home(), s.get("open_webui") or {}) if Mirror else None
         self._seen: OrderedDict = OrderedDict()
         self._names: Dict[str, str] = {}
+        self._mirror_prev: Dict[str, Any] = {}
         self._runner = None
         self._http = None
 
@@ -141,8 +155,10 @@ class ZaloOAAdapter(BasePlatformAdapter):
                 data = await self._api(oa_id, "GET", "/user/detail",
                                        params={"data": json.dumps({"user_id": user_id})})
                 name = (data.get("data") or {}).get("display_name") or ""
-            except (ZaloAuthError, OSError, ValueError) as e:
+            except Exception as e:  # mang/Zalo loi: van tra loi khach, chi thieu ten
                 logger.debug("[zalo_oa] user/detail loi: %s", e)
+            if len(self._names) > 5000:
+                self._names.clear()
             self._names[key] = name
         return self._names[key]
 
@@ -151,13 +167,13 @@ class ZaloOAAdapter(BasePlatformAdapter):
         oa_id, _, user_id = chat_id.partition(":")
         if oa_id not in self.oa_ids or not user_id:  # vd kenh nha "none" cua cron
             return SendResult(success=False, error=f"zalo_oa: chat_id khong hop le {chat_id!r}")
-        text = strip_markdown(content)
+        text = strip_markdown(guard_text(PLATFORM, user_id, content))
         last = SendResult(success=True)
         for part in self.truncate_message(text):
             try:
                 data = await self._api(oa_id, "POST", "/message/cs",
                                        json={"recipient": {"user_id": user_id}, "message": {"text": part}})
-            except (ZaloAuthError, OSError) as e:
+            except Exception as e:  # ZaloAuthError, aiohttp.ClientError, TimeoutError...
                 logger.error("[zalo_oa] gui tin loi: %s", e)
                 return SendResult(success=False, error=str(e))
             if data.get("error", 0) != 0:
@@ -166,7 +182,10 @@ class ZaloOAAdapter(BasePlatformAdapter):
             last = SendResult(success=True, message_id=(data.get("data") or {}).get("message_id"))
         if self.mirror:
             name = self._names.get(chat_id) or user_id[-6:]
-            await asyncio.to_thread(self.mirror.add, f"zalo:{chat_id}", f"Zalo · {name}", "assistant", text)
+            prev = self._mirror_prev.pop(chat_id, None)
+            if prev and not prev.done():  # chep tin khach truoc
+                await asyncio.wait([prev], timeout=20)
+            self.mirror.add_async(f"zalo:{chat_id}", f"Zalo · {name}", "assistant", text)
         return last
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
@@ -181,7 +200,7 @@ class ZaloOAAdapter(BasePlatformAdapter):
             ok = res["oa_id"] in self.oa_ids
             msg = (f"Đã kết nối Zalo OA {res['oa_id']}. Có thể đóng trang này." if ok else
                    f"Đã lưu token OA {res['oa_id']}, nhưng OA này chưa có trong zalo.oa_ids của chatbot.")
-        except (ZaloAuthError, OSError) as e:
+        except Exception as e:
             logger.warning("[zalo_oa] callback loi: %s", e)
             msg = f"Kết nối chưa thành công: {e}"
         html = f"<!doctype html><meta charset=utf-8><title>Zalo OA</title><p style='font:16px sans-serif'>{_esc(msg)}</p>"
@@ -230,10 +249,17 @@ class ZaloOAAdapter(BasePlatformAdapter):
 
     async def _dispatch(self, oa_id, user_id, text, msg_id, body):
         chat_id = f"{oa_id}:{user_id}"
-        name = await self._display_name(oa_id, user_id)
+        name = ""
+        try:
+            name = await asyncio.wait_for(self._display_name(oa_id, user_id), timeout=10)
+        except Exception as e:
+            logger.debug("[zalo_oa] khong lay duoc ten khach: %s", e)
         self._names[chat_id] = name or self._names.get(chat_id, "")
-        if self.mirror:
-            await asyncio.to_thread(self.mirror.add, f"zalo:{chat_id}", f"Zalo · {name or user_id[-6:]}", "user", text)
+        if self.mirror:  # khong cho Open WebUI: chep song song
+            if len(self._mirror_prev) > 5000:
+                self._mirror_prev = {k: f for k, f in self._mirror_prev.items() if not f.done()}
+            self._mirror_prev[chat_id] = self.mirror.add_async(
+                f"zalo:{chat_id}", f"Zalo · {name or user_id[-6:]}", "user", text)
         source = self.build_source(chat_id=chat_id, chat_name=name or chat_id, chat_type="dm",
                                    user_id=user_id, user_name=name or None)
         await self.handle_message(MessageEvent(text=text, message_type=MessageType.TEXT, source=source,
