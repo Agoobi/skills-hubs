@@ -1,11 +1,11 @@
-"""Kho token Zalo OA dung chung (skill chatbot-tu-van va viet-bai-zalo-oa). Chi dung thu vien chuan.
+"""Kho token Zalo OA cho skill viet-bai-zalo-oa. Chi dung thu vien chuan.
 
 Refresh token cua Zalo chi dung duoc 1 LAN: hai tien trinh tu lam moi rieng se lam hong nhau.
-Vi vay moi noi deu doc/ghi cung 1 file ($ZALO_TOKEN_FILE, mac dinh ~/.hermes/zalo/tokens.json)
-va khoa file (fcntl) khi lam moi. Giu file nay giong nhau o ca 2 skill.
+Vi vay moi lenh deu doc/ghi cung 1 file ($ZALO_TOKEN_FILE, mac dinh ~/.hermes/zalo/tokens.json)
+va khoa file (fcntl) khi lam moi.
 
 Dong lenh (ket noi OA, xem token):
-    python3 -I zalo_tokens.py auth-url --redirect https://bot.shop.vn/zalo/callback
+    python3 -I zalo_tokens.py auth-url --redirect https://shop.vn/
     python3 -I zalo_tokens.py auth-code "<URL callback day du sau khi chu OA bam Dong y>"
     python3 -I zalo_tokens.py list | refresh --oa <oa_id>
 

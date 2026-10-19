@@ -4,7 +4,7 @@
 Lenh: oas | connect | connect-finish | check | draft | update | list | detail
 Bai luon tao o trang thai AN (status=hide): chu OA tu kiem tra va bat hien thi tren oa.zalo.me.
 KHONG co lenh dang/hien bai, khong co lenh xoa. Ket qua in ra JSON de agent doc.
-Token OA dung chung voi skill chatbot-tu-van qua zalo_tokens.py (file ~/.hermes/zalo/tokens.json).
+Token OA luu qua zalo_tokens.py (file ~/.hermes/zalo/tokens.json).
 """
 import argparse, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path

@@ -26,14 +26,13 @@ Viết bài (article) cho **Zalo Official Account** theo các "cổng" (gate) đ
 
 Mọi lệnh chạy bằng `python -I scripts/zalooa.py <lệnh>` từ thư mục skill (chỉ cần Python 3). Cần env `ZALO_APP_ID`, `ZALO_APP_SECRET` (app trên developers.zalo.me mà admin quản lý).
 
-1. App Zalo: mục **Official Account** khai báo callback URL (vd `https://bot.shop.vn/zalo/callback` nếu đã cài `chatbot-tu-van`, hoặc một trang bất kỳ của mình) và bật quyền **quản lý bài viết**.
+1. App Zalo: mục **Official Account** khai báo callback URL là một trang bất kỳ của mình (vd trang chủ website `https://shop.vn/`) và bật quyền **quản lý bài viết**.
 2. `connect --redirect <callback URL>` → gửi link cho **chủ OA** (tài khoản Zalo có quyền admin OA) bấm Đồng ý.
-   - Nếu callback là trang `/zalo/callback` của chatbot: token tự lưu.
-   - Nếu không: chủ OA gửi lại URL trên thanh địa chỉ sau khi đồng ý → `connect-finish "<URL>"`. Link hết hạn sau 30 phút.
-3. Copy `settings.example.json` thành `settings.json`, điền `oa_id` (xem bằng `oas`), giọng văn, tác giả. Xem `references/viet-bai.md`.
-4. `check --oa <alias>`: kiểm tra token, tên OA, quyền đọc bài viết.
+3. Zalo chuyển chủ OA về callback URL kèm `?code=...&oa_id=...`. Chủ OA copy nguyên URL trên thanh địa chỉ gửi lại → `connect-finish "<URL>"`. Link hết hạn sau 30 phút.
+4. Copy `settings.example.json` thành `settings.json`, điền `oa_id` (xem bằng `oas`), giọng văn, tác giả. Xem `references/viet-bai.md`.
+5. `check --oa <alias>`: kiểm tra token, tên OA, quyền đọc bài viết.
 
-Token lưu ở `~/.hermes/zalo/tokens.json` (quyền 600, tự làm mới, có khóa file), **dùng chung** với skill `chatbot-tu-van`: kết nối OA một lần là cả hai dùng được. Refresh token hết hạn sau khoảng 3 tháng không dùng; khi đó chạy lại bước 2.
+Token lưu ở `~/.hermes/zalo/tokens.json` (quyền 600, tự làm mới, có khóa file). Refresh token hết hạn sau khoảng 3 tháng không dùng; khi đó chạy lại bước 2.
 
 ## Quy trình (các Gate)
 

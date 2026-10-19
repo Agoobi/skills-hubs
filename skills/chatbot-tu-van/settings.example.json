@@ -9,7 +9,7 @@
   "fallback_text": "Dạ câu này em chưa có thông tin chính xác. Anh/chị để lại số điện thoại, nhân viên bên em sẽ liên hệ tư vấn ngay ạ.",
   "guard": {
     "enabled": true,
-    "platforms": ["webchat", "zalo_oa"],
+    "platforms": ["webchat"],
     "max_passages": 5
   },
   "open_webui": {
@@ -28,13 +28,5 @@
     "title": "Tư vấn Shop Mẫu",
     "color": "#0f5c8c",
     "greeting": "Xin chào! Em là trợ lý của Shop Mẫu. Anh/chị cần tư vấn gì ạ?"
-  },
-  "zalo": {
-    "host": "127.0.0.1",
-    "port": 8651,
-    "oa_ids": ["OA_ID_CUA_KHACH"],
-    "oa_secret_key": "OA_SECRET_KEY_TRONG_MUC_WEBHOOK_CUA_APP",
-    "verify_signature": true,
-    "verify_files": {}
   }
 }

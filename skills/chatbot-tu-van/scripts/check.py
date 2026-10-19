@@ -11,7 +11,7 @@ import argparse, hashlib, json, os, subprocess, sys, time, urllib.error, urllib.
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-PLUGINS = {"webchat": ["owui_mirror.py"], "zalo_oa": ["owui_mirror.py", "zalo_tokens.py"], "chatbot_guard": ["kb.py"]}
+PLUGINS = {"webchat": ["owui_mirror.py"], "chatbot_guard": ["kb.py"]}
 KB_TOOLS = {"tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"}
 PLACEHOLDER = ("DAN_", "_CUA_KHACH", "example.com", "shopmau.vn", "OA_SECRET_KEY_TRONG")
 
@@ -81,23 +81,23 @@ def check_install(home, cfg):
 
     enabled = ((cfg.get("plugins") or {}).get("enabled")) or []
     miss = [p for p in PLUGINS if p not in enabled]
-    add("plugins.enabled", not miss, "thieu: " + ", ".join(miss) if miss else "du 3 plugin", "Chay scripts/setup.py")
+    add("plugins.enabled", not miss, "thieu: " + ", ".join(miss) if miss else "du 2 plugin", "Chay scripts/setup.py")
 
     kb = (cfg.get("mcp_servers") or {}).get("kb") or {}
     inc = set(((kb.get("tools") or {}).get("include")) or [])
     add("mcp_servers.kb", bool(kb) and inc == KB_TOOLS, f"tools: {sorted(inc)}", "Chay scripts/setup.py")
 
     pt = cfg.get("platform_toolsets") or {}
-    bad = {p: pt.get(p) for p in ("webchat", "zalo_oa") if pt.get(p) != ["kb"]}
-    add("platform_toolsets", not bad, f"khac ['kb']: {bad}" if bad else "webchat, zalo_oa = ['kb']",
-        "Dat platform_toolsets.webchat/zalo_oa = [kb] (setup.py lam san)")
+    bad = {p: pt.get(p) for p in ("webchat",) if pt.get(p) != ["kb"]}
+    add("platform_toolsets", not bad, f"khac ['kb']: {bad}" if bad else "webchat = ['kb']",
+        "Dat platform_toolsets.webchat = [kb] (setup.py lam san)")
 
     try:
         from gateway.display_config import resolve_display_setting
     except ImportError:
         pass
     else:
-        for p in ("webchat", "zalo_oa"):
+        for p in ("webchat",):
             loud = {k: resolve_display_setting(cfg, p, k) for k in ("tool_progress", "interim_assistant_messages",
                                                                    "long_running_notifications", "streaming")}
             bad = {k: v for k, v in loud.items() if v not in ("off", False, None)}
@@ -114,14 +114,14 @@ def check_install(home, cfg):
         import logging
         logging.disable(logging.WARNING)  # Hermes canh bao "kb" khong phai toolset tinh: dung, vi la ten MCP server
         from model_tools import get_tool_definitions
-        for p in ("webchat", "zalo_oa"):
+        for p in ("webchat",):
             got = set(_get_platform_tools(cfg, p))
             extra = sorted(got - {"kb"})
             # toolset co the duoc bat nhung tool tu tat (vd kanban chi hien khi chay kanban): dem tool thuc te
             tools = [t["function"]["name"] for t in get_tool_definitions(enabled_toolsets=extra, quiet_mode=True)] if extra else []
             add(f"tool kenh {p}", not tools, f"MCP kb + tool khac: {tools or 'khong co'} (toolset {sorted(got)})",
                 "Kenh chat chi duoc co MCP kb. Bo toolset thua trong platform_toolsets hoac tat plugin co tool")
-    for mod, why in (("aiohttp", "kenh webchat/zalo_oa"), ("mcp", "tool tra tai lieu")):
+    for mod, why in (("aiohttp", "kenh webchat"), ("mcp", "tool tra tai lieu")):
         try:
             __import__(mod)
             add(f"goi {mod}", True, why)
@@ -134,7 +134,7 @@ def check_data(home, chat, s, env):
     add("settings.json", bool(s), str(chat / "settings.json"), "Chay scripts/setup.py roi dien settings.json")
     biz = s.get("business") or {}
     if is_placeholder(biz.get("ten")) or biz.get("ten") == "Shop Mẫu" or is_placeholder(biz.get("hotline")) or "234 567" in str(biz.get("hotline")):
-        warn("business", "Van la thong tin mau", "Dien ten, hotline, zalo, gio lam viec that")
+        warn("business", "Van la thong tin mau", "Dien ten, hotline, gio lam viec that")
     else:
         add("business", True, biz.get("ten"))
     files = sorted((chat / "knowledge").glob("*.md"))
@@ -172,34 +172,16 @@ def check_data(home, chat, s, env):
     if not wc.get("allowed_origins") or any(is_placeholder(o) for o in wc["allowed_origins"]):
         add("webchat.allowed_origins", False, str(wc.get("allowed_origins")), "Dien domain website, vd https://shop.vn")
 
-    if env.get("ZALO_APP_ID"):
-        z = s.get("zalo") or {}
-        oas = [o for o in z.get("oa_ids") or [] if not is_placeholder(o)]
-        add("zalo.oa_ids", bool(oas), str(z.get("oa_ids")), "Dien OA id (vd lay tu lenh zalo_tokens.py list)")
-        if z.get("verify_signature", True) and is_placeholder(z.get("oa_secret_key")):
-            add("zalo.oa_secret_key", False, "chua dien", "developers.zalo.me > app > Webhook > OA Secret Key")
-        tf = Path(env.get("ZALO_TOKEN_FILE") or Path.home() / ".hermes" / "zalo" / "tokens.json").expanduser()
-        tok = json.loads(tf.read_text()).get("oas", {}) if tf.exists() else {}
-        for oa in oas:
-            e = tok.get(str(oa)) or {}
-            if not e.get("refresh_token"):
-                add(f"token OA {oa}", False, f"chua co trong {tf}", "zalo_tokens.py auth-url --redirect https://<bot>/zalo/callback")
-            else:
-                left = (e.get("updated_at", 0) + 90 * 86400 - time.time()) / 86400
-                add(f"token OA {oa}", True, f"refresh token con khoang {left:.0f} ngay (tu gia han khi dung)")
 
 
 def check_running(s, env):
-    for p, key, dport in (("webchat", "webchat", 8650), ("zalo_oa", "zalo", 8651)):
-        if p == "zalo_oa" and not env.get("ZALO_APP_ID"):
-            continue
-        c = s.get(key) or {}
-        url = f"http://{c.get('host') or '127.0.0.1'}:{c.get('port') or dport}/health"
-        url = url.replace("0.0.0.0", "127.0.0.1")
-        try:
-            add(f"{p} dang chay", http("GET", url, timeout=5)[1].get("ok"), url)
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            add(f"{p} dang chay", False, f"{url}: {e}", "hermes [-p profile] gateway restart; xem logs/agent.log")
+    c = s.get("webchat") or {}
+    url = f"http://{c.get('host') or '127.0.0.1'}:{c.get('port') or 8650}/health"
+    url = url.replace("0.0.0.0", "127.0.0.1")
+    try:
+        add("webchat dang chay", http("GET", url, timeout=5)[1].get("ok"), url)
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        add("webchat dang chay", False, f"{url}: {e}", "hermes [-p profile] gateway restart; xem logs/agent.log")
 
 
 def ask(s, question):

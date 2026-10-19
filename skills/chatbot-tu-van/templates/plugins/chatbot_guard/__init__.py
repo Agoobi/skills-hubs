@@ -1,4 +1,4 @@
-"""chatbot_guard: rao chan bang code cho chatbot tu van (kenh webchat, zalo_oa).
+"""chatbot_guard: rao chan bang code cho chatbot tu van (kenh webchat).
 
 Khong phu thuoc agent co nghe theo skill hay khong:
 1. pre_gateway_dispatch: khach go "/lenh" thi bo dau "/" (khach khong duoc dung lenh quan tri cua Hermes).
@@ -21,7 +21,7 @@ from . import kb
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PLATFORMS = {"webchat", "zalo_oa"}
+DEFAULT_PLATFORMS = {"webchat"}
 DEFAULT_FALLBACK = ("Dạ câu này em chưa có thông tin chính xác. Anh/chị để lại số điện thoại, "
                     "nhân viên bên em sẽ liên hệ tư vấn ngay ạ.")
 _lock = threading.Lock()
@@ -146,7 +146,7 @@ def on_dispatch(event=None, **_):
     return None
 
 
-CHANNELS = {"webchat": "khung chat tren website", "zalo_oa": "Zalo Official Account"}
+CHANNELS = {"webchat": "khung chat tren website"}
 
 
 def rules(platform: str) -> str:

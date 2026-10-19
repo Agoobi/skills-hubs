@@ -1,8 +1,8 @@
 """Chep hoi thoai cua chatbot sang Open WebUI de chu shop xem.
 
-Moi nguoi hoi (kenh + id) = 1 chat trong sidebar cua tai khoan Open WebUI so huu API key.
+Moi khach (kenh + id) = 1 chat trong sidebar cua tai khoan Open WebUI so huu API key.
 Dung API backend cua Open WebUI: POST /api/v1/chats/new, GET/POST /api/v1/chats/<id>.
-Chi dung thu vien chuan; setup.py chep file nay vao plugin webchat va zalo_oa.
+Chi dung thu vien chuan; setup.py chep file nay vao plugin webchat.
 """
 import asyncio, fcntl, json, logging, os, threading, time, uuid, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
@@ -94,7 +94,7 @@ class Mirror:
         hist["currentId"] = msg["id"]
         chat.setdefault("messages", []).append(msg)
         if title and chat.get("title") != title and entry.get("title") != title:
-            chat["title"] = title  # vd: biet ten khach Zalo sau tin dau
+            chat["title"] = title
             entry["title"] = title
             self._map(conv_key, entry, write=True)
         self._req("POST", f"/api/v1/chats/{entry['chat_id']}", {"chat": chat})
