@@ -35,7 +35,7 @@ Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, 
 Lệnh chạy từ thư mục skill. `setup.py` và `check.py` cần Python của Hermes (có PyYAML), ví dụ `~/.hermes/hermes-agent/venv/bin/python`; gọi tắt là `HPY` bên dưới. `kb.py`, `eval.py` chỉ cần Python 3.
 
 **Gate 1 — Thu thập (hỏi user 1 lượt, thiếu thì hỏi lại, không đoán).**
-Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI + API key của tài khoản sẽ xem hội thoại; tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
+Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI + API key của tài khoản sẽ xem hội thoại, tên folder muốn chứa các chat đó (tùy chọn); tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
 
 **Gate 2 — Cài.**
 
@@ -45,7 +45,7 @@ HPY scripts/setup.py --profile <ten>
 
 Script chép plugin, ghi `config.yaml` (bật plugin, MCP `kb`, giới hạn toolset kênh chat, tắt onboarding), ghi `.env` (quyền 600) và tạo `chatbot/settings.json` từ mẫu. Chạy lại an toàn (giữ `settings.json`, sao lưu `config.yaml.bak-chatbot`). Có `warnings` về thiếu `aiohttp` / `mcp` thì cài theo lệnh in ra.
 
-**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `open_webui`, `lead_webhook` nếu có. Cho user xem lại (che key) trước khi lưu.
+**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `open_webui` (kèm `folder` nếu user muốn), `lead_webhook` nếu có. Cho user xem lại (che key) trước khi lưu.
 
 **Gate 4 — Nạp tài liệu.**
 

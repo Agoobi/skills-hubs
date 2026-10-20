@@ -15,7 +15,8 @@
   "open_webui": {
     "url": "https://chat.example.com",
     "api_key": "sk-DAN_API_KEY_OPEN_WEBUI_CUA_KHACH",
-    "model_label": "Chatbot Shop Mẫu"
+    "model_label": "Chatbot Shop Mẫu",
+    "folder": "Tin nhắn từ chatbot website"
   },
   "lead_webhook": {
     "url": "",

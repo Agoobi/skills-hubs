@@ -165,6 +165,7 @@ def check_data(home, chat, s, env):
         try:
             code, me = http("GET", ow["url"].rstrip("/") + "/api/v1/auths/", headers={"Authorization": f"Bearer {ow['api_key']}"})
             add("Open WebUI", True, f"API key cua: {me.get('name') or me.get('email')}")
+            check_folder(ow)
         except (urllib.error.URLError, OSError, ValueError) as e:
             add("Open WebUI", False, f"{ow['url']}: {e}", "Kiem tra URL va API key (Admin phai bat API keys)")
 
@@ -172,6 +173,28 @@ def check_data(home, chat, s, env):
     if not wc.get("allowed_origins") or any(is_placeholder(o) for o in wc["allowed_origins"]):
         add("webchat.allowed_origins", False, str(wc.get("allowed_origins")), "Dien domain website, vd https://shop.vn")
 
+
+
+def check_folder(ow):
+    name = (ow.get("folder") or "").strip()
+    if not name:
+        add("Open WebUI folder", True, "khong dat folder: chat nam ngoai folder")
+        return
+    sys.path.insert(0, str(SKILL / "scripts"))
+    from owui_mirror import Mirror, UUID_RE
+    m = Mirror(Path("."), ow)
+    try:
+        fid = m.folder_id(create=False)  # check.py chi doc, khong tao folder
+    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as e:
+        add("Open WebUI folder", False, f"{name}: {e}", "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
+        return
+    if fid:
+        add("Open WebUI folder", True, f"{name} -> {fid}")
+    elif UUID_RE.match(name):
+        add("Open WebUI folder", False, f"Khong thay folder id {name}",
+            "Dung ten folder, hoac id lay tu URL .../folders/<id> cua dung tai khoan so huu API key")
+    else:
+        warn("Open WebUI folder", f"Chua co folder '{name}': bot se tu tao khi co tin dau tien", "")
 
 
 def check_running(s, env):

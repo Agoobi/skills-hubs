@@ -21,6 +21,7 @@ Cổng chỉ nghe `127.0.0.1`; ra Internet qua reverse proxy có HTTPS. Mỗi kh
 | `fallback_text` | Câu thay thế khi câu trả lời bị chặn vì có số liệu không có căn cứ. |
 | `guard.enabled / platforms / max_passages` | Bật hook, kênh áp dụng (mặc định `webchat`), số đoạn tài liệu chèn mỗi lượt. |
 | `open_webui.url / api_key / model_label` | Nơi chép hội thoại. Chat thuộc tài khoản sở hữu API key. `model_label` là tên hiển thị của bot. |
+| `open_webui.folder` | Folder chứa chat của khách: tên folder (chưa có thì bot tự tạo) hoặc id (đoạn cuối URL `.../folders/<id>`). Để trống: chat nằm ngoài folder. |
 | `lead_webhook.url / secret` | Nhận sự kiện `lead`, `handoff`, `guard_blocked` (JSON). Header `X-Chatbot-Timestamp`, `X-Chatbot-Signature: sha256=HMAC_SHA256(secret, timestamp + "." + body)`. |
 | `webchat.allowed_origins` | Danh sách origin website được nhúng (đủ cả `www`). Thiếu thì kênh không bật. |
 | `webchat.title / color / greeting` | Giao diện khung chat. |
@@ -52,7 +53,7 @@ Kiểm tra từ ngoài: `https://bot.shop.vn/health` phải trả `ok`.
 
 1. Admin Panel > Settings > General: bật **API Keys** (Enable API Key).
 2. Đăng nhập tài khoản sẽ xem hội thoại > Settings > Account > API keys > tạo key, dán vào `open_webui.api_key`.
-3. Mỗi khách 1 chat trong sidebar: `Web · khách <mã>`. Đổi tên chat trong Open WebUI thì plugin không ghi đè. Xóa chat thì tin tiếp theo của khách tạo chat mới.
+3. Mỗi khách 1 chat trong sidebar: `Web · khách <mã>`, nằm trong folder `open_webui.folder` nếu có đặt. Đổi folder (rồi restart gateway) thì chat cũ được chuyển sang folder mới ở tin tiếp theo; chủ shop tự kéo chat ra khỏi folder thì bot không kéo lại. Đổi tên chat trong Open WebUI thì plugin không ghi đè. Xóa chat thì tin tiếp theo của khách tạo chat mới.
 4. Chỉ để xem. Gõ trả lời trong Open WebUI sẽ gửi cho model của Open WebUI, **không** tới khách. Muốn nhân viên trả lời khách: gọi lại theo số khách để lại.
 
 ## Dữ liệu trên máy
