@@ -11,7 +11,7 @@ import argparse, hashlib, json, os, subprocess, sys, time, urllib.error, urllib.
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-PLUGINS = {"webchat": ["owui_mirror.py"], "chatbot_guard": ["kb.py"]}
+PLUGINS = {"webchat": ["owui_mirror.py"], "chatbot_guard": ["kb.py", "owui_mirror.py"]}
 KB_TOOLS = {"tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"}
 PLACEHOLDER = ("DAN_", "_CUA_KHACH", "example.com", "shopmau.vn", "OA_SECRET_KEY_TRONG")
 
@@ -137,9 +137,24 @@ def check_data(home, chat, s, env):
         warn("business", "Van la thong tin mau", "Dien ten, hotline, gio lam viec that")
     else:
         add("business", True, biz.get("ten"))
-    files = sorted((chat / "knowledge").glob("*.md"))
-    add("kho tai lieu", bool(files), f"{len(files)} file: " + ", ".join(f.name for f in files[:8]),
-        "Nap tai lieu: kb.py --home <chatbot> ingest <file...>")
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import kb
+    st = kb.knowledge_state(chat)
+    ok = [f["file"] for f in st["knowledge"] if f["state"] != "chua_verify"]
+    add("kho kien thuc", bool(ok), f"{len(ok)} file bot dang dung: " + ", ".join(ok[:8]),
+        "Nap file goc (kb.py ingest), soan knowledge/<chu-de>.md, roi kb.py verify")
+    bad = [f["file"] for f in st["knowledge"] if f["state"] == "chua_verify"]
+    if bad:
+        add("kien thuc chua verify", False, "Bot KHONG dung: " + ", ".join(bad), "kb.py --home <chatbot> verify (sua so lieu theo nguon)")
+    old = [f"{f['file']} (nguon doi: {', '.join(f['nguon_doi'])})" for f in st["knowledge"] if f["state"] == "nguon_da_doi"]
+    if old:
+        warn("kien thuc can cap nhat", "Bot dang dung ban cu: " + "; ".join(old), "Soan lai theo file nguon moi roi kb.py verify")
+    if st["nguon_chua_dung"]:
+        warn("nguon chua dung", ", ".join(st["nguon_chua_dung"]), "Soan kien thuc tu cac file nay, hoac kb.py remove --nguon <file>")
+    fields = s.get("thu_thap_khach", kb.DEFAULT_FIELDS)
+    unknown = [f for f in fields if f not in kb.FIELDS] if isinstance(fields, list) else [fields]
+    add("thu_thap_khach", not unknown, f"bot xin khach: {kb.lead_fields(s) or 'khong xin (moi lien he hotline)'}"
+        + (f"; khong hieu: {unknown}" if unknown else ""), f"Chi dung: {', '.join(kb.FIELDS)}")
 
     # MCP kb tra loi dung giao thuc
     kb_py = chat / "kb.py"
@@ -165,7 +180,8 @@ def check_data(home, chat, s, env):
         try:
             code, me = http("GET", ow["url"].rstrip("/") + "/api/v1/auths/", headers={"Authorization": f"Bearer {ow['api_key']}"})
             add("Open WebUI", True, f"API key cua: {me.get('name') or me.get('email')}")
-            check_folder(ow)
+            check_folder(ow, "folder", "Open WebUI folder")
+            check_folder(ow, "lead_folder", "Open WebUI folder lead")
         except (urllib.error.URLError, OSError, ValueError) as e:
             add("Open WebUI", False, f"{ow['url']}: {e}", "Kiem tra URL va API key (Admin phai bat API keys)")
 
@@ -175,26 +191,26 @@ def check_data(home, chat, s, env):
 
 
 
-def check_folder(ow):
-    name = (ow.get("folder") or "").strip()
+def check_folder(ow, key, label):
+    name = (ow.get(key) or "").strip()
     if not name:
-        add("Open WebUI folder", True, "khong dat folder: chat nam ngoai folder")
+        add(label, True, "khong dat: chat khach nam ngoai folder" if key == "folder" else "khong dat: khong bao lead vao Open WebUI")
         return
     sys.path.insert(0, str(SKILL / "scripts"))
     from owui_mirror import Mirror, UUID_RE
-    m = Mirror(Path("."), ow)
+    m = Mirror(Path("."), {**ow, "folder": name})
     try:
         fid = m.folder_id(create=False)  # check.py chi doc, khong tao folder
     except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as e:
-        add("Open WebUI folder", False, f"{name}: {e}", "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
+        add(label, False, f"{name}: {e}", "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
         return
     if fid:
-        add("Open WebUI folder", True, f"{name} -> {fid}")
+        add(label, True, f"{name} -> {fid}")
     elif UUID_RE.match(name):
-        add("Open WebUI folder", False, f"Khong thay folder id {name}",
+        add(label, False, f"Khong thay folder id {name}",
             "Dung ten folder, hoac id lay tu URL .../folders/<id> cua dung tai khoan so huu API key")
     else:
-        warn("Open WebUI folder", f"Chua co folder '{name}': bot se tu tao khi co tin dau tien", "")
+        warn(label, f"Chua co folder '{name}': bot se tu tao khi can", "")
 
 
 def check_running(s, env):

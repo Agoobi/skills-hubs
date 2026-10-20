@@ -19,14 +19,14 @@ Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, 
 | Thành phần (cài vào `$HERMES_HOME/plugins/`) | Việc làm |
 |---|---|
 | `webchat` (kênh) | Phục vụ `widget.js`, nhận tin khách qua `/api/chat`, trả lời qua long-poll. Chặn domain lạ (CORS), giới hạn tốc độ. |
-| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản không có trong tài liệu (thay bằng câu xin SĐT và ghi sự kiện); bỏ dấu `/` để khách không gọi lệnh Hermes. |
-| MCP `kb` (`chatbot/kb.py`) | 4 tool duy nhất của kênh chat: `tim_kien_thuc`, `doc_tai_lieu`, `luu_khach_hang`, `chuyen_nhan_vien`. Kênh chat **không có** terminal, file, web. |
+| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản không có trong tài liệu (thay bằng câu xin thông tin liên hệ và ghi sự kiện); không có thông tin thì nói chưa có và xin khách các thông tin trong `thu_thap_khach`; báo khách cần tư vấn vào folder lead của Open WebUI; bỏ dấu `/` để khách không gọi lệnh Hermes. |
+| MCP `kb` (`chatbot/kb.py`) | 4 tool duy nhất của kênh chat: `tim_kien_thuc`, `doc_tai_lieu`, `luu_khach_hang`, `chuyen_nhan_vien`. Kênh chat **không có** terminal, file, web. Chỉ tìm trong file kiến thức **đã `verify`** và chưa bị sửa sau đó. |
 
 ## Quy tắc sắt
 
 1. **Không tắt hoặc sửa `chatbot_guard`** để "cho bot trả lời được". Bot thiếu thông tin thì bổ sung tài liệu.
 2. **Không thêm toolset nào** vào `platform_toolsets.webchat` ngoài `kb`. `check.py` báo lỗi nếu có.
-3. Chỉ nạp tài liệu **khách hàng đã gửi và duyệt**. Sau khi nạp, đọc lại file `.md` sinh ra và cho user xác nhận các con số (giá, %, chính sách) trước khi bật bot.
+3. Chỉ nạp tài liệu **khách hàng đã gửi và duyệt**. Kiến thức soạn ra chỉ lấy từ file nguồn, **không thêm, không suy đoán**; nguồn mâu thuẫn hoặc thiếu thì **hỏi lại user**, không tự chọn. Không sửa con số cho qua `verify`: sai thì sửa theo nguồn.
 4. Không in API key, secret ra chat. Không commit `settings.json`.
 5. Mọi việc chỉ dừng ở **cấu hình + kiểm tra**. Không tự nhắn tin cho khách, không xóa lịch sử chat.
 
@@ -35,7 +35,7 @@ Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, 
 Lệnh chạy từ thư mục skill. `setup.py` và `check.py` cần Python của Hermes (có PyYAML), ví dụ `~/.hermes/hermes-agent/venv/bin/python`; gọi tắt là `HPY` bên dưới. `kb.py`, `eval.py` chỉ cần Python 3.
 
 **Gate 1 — Thu thập (hỏi user 1 lượt, thiếu thì hỏi lại, không đoán).**
-Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI + API key của tài khoản sẽ xem hội thoại, tên folder muốn chứa các chat đó (tùy chọn); tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
+Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI + API key của tài khoản sẽ xem hội thoại; folder chứa chat của khách và folder báo khách cần tư vấn (tên hoặc link folder, tùy chọn); khi bot không có thông tin thì xin khách gì (`ten`, `sdt`, `email`, `zalo`, `dia_chi`, `cong_ty`, `thoi_gian`, hoặc không xin mà mời gọi hotline); tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
 
 **Gate 2 — Cài.**
 
@@ -45,16 +45,15 @@ HPY scripts/setup.py --profile <ten>
 
 Script chép plugin, ghi `config.yaml` (bật plugin, MCP `kb`, giới hạn toolset kênh chat, tắt onboarding), ghi `.env` (quyền 600) và tạo `chatbot/settings.json` từ mẫu. Chạy lại an toàn (giữ `settings.json`, sao lưu `config.yaml.bak-chatbot`). Có `warnings` về thiếu `aiohttp` / `mcp` thì cài theo lệnh in ra.
 
-**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `open_webui` (kèm `folder` nếu user muốn), `lead_webhook` nếu có. Cho user xem lại (che key) trước khi lưu.
+**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `open_webui` (kèm `folder`, `lead_folder` nếu user muốn; dán link folder thì lấy id ở cuối), `thu_thap_khach`, `lead_webhook` nếu có. `fallback_text` để trống thì tự ghép theo `thu_thap_khach`. Cho user xem lại (che key) trước khi lưu.
 
-**Gate 4 — Nạp tài liệu.**
+**Gate 4 — Soạn kiến thức** (chi tiết: `references/kien-thuc.md`). Gọi `KB="python3 -I scripts/kb.py --home <HERMES_HOME>/chatbot"`.
 
-```
-python3 -I scripts/kb.py --home <HERMES_HOME>/chatbot ingest <file...>
-python3 -I scripts/kb.py --home <HERMES_HOME>/chatbot list
-```
-
-Mỗi file thành `knowledge/<ten>.md` (bảng Excel thành từng dòng "Cột: giá trị"). Đọc lại từng file `.md`, chỉ ra chỗ lỗi (bảng vỡ, PDF scan không có chữ, số bị tách) và hỏi user xác nhận. Cùng tên file thì ghi đè (`replaced: true`). Cập nhật tài liệu sau này: nạp lại, không cần restart.
+1. `$KB ingest <file...>`: mỗi file thành `nguon/<ten>.md` (bản gốc, bot **không** đọc). Đọc lại, báo chỗ lỗi (bảng vỡ, PDF scan không có chữ).
+2. Soạn `knowledge/<chu-de>.md` theo chủ đề khách hay hỏi (giá, sản phẩm, chính sách, FAQ...), dòng 2 ghi `<!-- nguon: a.md, b.md -->`.
+3. Cho user xem từng file, sửa đến khi user đồng ý.
+4. `$KB verify`: mọi con số (giá, %, số ngày, SĐT, mã...) phải có trong file nguồn đã ghi. File lỗi thì bot không dùng; sửa theo nguồn rồi chạy lại.
+5. `$KB status` phải `ok`. Không cần restart.
 
 **Gate 5 — Hạ tầng** (admin làm theo `references/trien-khai.md`): reverse proxy HTTPS cho `bot.shop.vn` vào cổng 8650; bật API key ở Open WebUI.
 
@@ -79,11 +78,17 @@ python3 scripts/eval.py --profile <ten> [--cases <file-cau-hoi-rieng.json>]
 <script src="https://bot.shop.vn/widget.js" defer></script>
 ```
 
-Kèm: hội thoại xem ở Open WebUI (tài khoản sở hữu API key, mỗi khách 1 chat tên `Web · khách …`); chỉ xem, trả lời trong Open WebUI **không** tới khách. Khách để lại thông tin / cần người thật / câu bị chặn nằm ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
+Kèm: hội thoại xem ở Open WebUI (tài khoản sở hữu API key, mỗi khách 1 chat tên `Web · khách …`); chỉ xem, trả lời trong Open WebUI **không** tới khách. Khách để lại thông tin / cần người thật / câu bị chặn hiện trong folder `lead_folder` của Open WebUI (mỗi khách 1 chat `Lead · …`, có link tới hội thoại), lưu ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
+
+## Cập nhật kiến thức (user gửi tài liệu mới bất cứ lúc nào)
+
+1. `$KB ingest <file mới>` (cùng tên thì thay bản cũ, `changed: true` nếu nội dung khác).
+2. `$KB status`: `nguon_da_doi` là file kiến thức cần soạn lại (bot vẫn dùng bản cũ đến khi verify bản mới); `nguon_chua_dung` là nguồn chưa có trong file kiến thức nào.
+3. Soạn lại đúng các file đó, cho user xem phần thay đổi (cũ → mới), rồi `$KB verify`. Bỏ tài liệu: `$KB remove --nguon <file>` và sửa / `$KB remove <file kiến thức>`.
 
 ## Bảo trì
 
-- Bot trả lời "chưa có thông tin" nhiều: xem `leads.jsonl` (loại `guard_blocked`) để biết khách hỏi gì, bổ sung tài liệu, chạy lại `eval.py`.
+- Bot trả lời "chưa có thông tin" nhiều: xem folder lead trong Open WebUI hoặc `leads.jsonl` (loại `guard_blocked`) để biết khách hỏi gì, hỏi user bổ sung tài liệu, chạy lại `eval.py`.
 - Cập nhật skill: `HPY scripts/setup.py --profile <ten>` rồi restart gateway; `check.py` báo `plugin da cai: Khac ban trong skill` khi quên.
 
 ## Xử lý lỗi

@@ -122,7 +122,7 @@ class Mirror:
                 chat, entry = {}, None  # chat bi xoa ben Open WebUI: tao lai
         if not entry:
             msg = self._msg(role, text, None)
-            chat = {"title": title, "models": [self.model], "messages": [msg],
+            chat = {"title": title or conv_key, "models": [self.model], "messages": [msg],
                     "history": {"messages": {msg["id"]: msg}, "currentId": msg["id"]}}
             fid = self._folder_safe()
             try:

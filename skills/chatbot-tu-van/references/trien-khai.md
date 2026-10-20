@@ -18,10 +18,12 @@ Cổng chỉ nghe `127.0.0.1`; ra Internet qua reverse proxy có HTTPS. Mỗi kh
 | Khóa | Ý nghĩa |
 |---|---|
 | `business` | Tên, hotline, số Zalo liên hệ, giờ làm việc, website. Được coi là thông tin chuẩn (bot được nhắc lại các số này). |
-| `fallback_text` | Câu thay thế khi câu trả lời bị chặn vì có số liệu không có căn cứ. |
+| `thu_thap_khach` | Bot xin khách gì khi tài liệu không có câu trả lời, theo thứ tự: `ten`, `sdt`, `email`, `zalo`, `dia_chi`, `cong_ty`, `thoi_gian`. `[]`: không xin, mời liên hệ hotline. Mặc định `["ten", "sdt"]`. |
+| `fallback_text` | Câu thay thế khi câu trả lời bị chặn vì có số liệu không có căn cứ. Để trống: tự ghép theo `thu_thap_khach`. |
 | `guard.enabled / platforms / max_passages` | Bật hook, kênh áp dụng (mặc định `webchat`), số đoạn tài liệu chèn mỗi lượt. |
 | `open_webui.url / api_key / model_label` | Nơi chép hội thoại. Chat thuộc tài khoản sở hữu API key. `model_label` là tên hiển thị của bot. |
 | `open_webui.folder` | Folder chứa chat của khách: tên folder (chưa có thì bot tự tạo) hoặc id (đoạn cuối URL `.../folders/<id>`). Để trống: chat nằm ngoài folder. |
+| `open_webui.lead_folder` | Folder báo khách cần tư vấn (cùng cách ghi như `folder`): khách để lại thông tin, cần gặp nhân viên, hoặc câu bot không trả lời được. Mỗi khách 1 chat `Lead · <tên/SĐT>`, mỗi sự kiện 1 tin, có link tới hội thoại. Để trống: không báo. |
 | `lead_webhook.url / secret` | Nhận sự kiện `lead`, `handoff`, `guard_blocked` (JSON). Header `X-Chatbot-Timestamp`, `X-Chatbot-Signature: sha256=HMAC_SHA256(secret, timestamp + "." + body)`. |
 | `webchat.allowed_origins` | Danh sách origin website được nhúng (đủ cả `www`). Thiếu thì kênh không bật. |
 | `webchat.title / color / greeting` | Giao diện khung chat. |
@@ -61,7 +63,9 @@ Kiểm tra từ ngoài: `https://bot.shop.vn/health` phải trả `ok`.
 ```
 $HERMES_HOME/chatbot/
   settings.json        cấu hình (quyền 600)
-  knowledge/*.md       tài liệu đã nạp (sửa tay được, bot đọc lại ngay)
+  nguon/*.md           file gốc đã chuyển sang Markdown (bot không đọc)
+  knowledge/*.md       kiến thức đã soạn theo chủ đề; bot chỉ dùng file đã verify
+  kiem_tra.json        kết quả verify (mã băm file kiến thức + nguồn)
   kb.py                MCP server + công cụ nạp/tìm
   leads.jsonl          lead, yêu cầu gặp người thật, câu trả lời bị chặn
   owui_chats.json      khách ↔ chat Open WebUI

@@ -6,7 +6,8 @@
     "gio_lam_viec": "8:00 - 21:00 hằng ngày",
     "website": "https://shopmau.vn"
   },
-  "fallback_text": "Dạ câu này em chưa có thông tin chính xác. Anh/chị để lại số điện thoại, nhân viên bên em sẽ liên hệ tư vấn ngay ạ.",
+  "thu_thap_khach": ["ten", "sdt"],
+  "fallback_text": "",
   "guard": {
     "enabled": true,
     "platforms": ["webchat"],
@@ -16,7 +17,8 @@
     "url": "https://chat.example.com",
     "api_key": "sk-DAN_API_KEY_OPEN_WEBUI_CUA_KHACH",
     "model_label": "Chatbot Shop Mẫu",
-    "folder": "Tin nhắn từ chatbot website"
+    "folder": "Tin nhắn từ chatbot website",
+    "lead_folder": "Khách cần tư vấn"
   },
   "lead_webhook": {
     "url": "",

@@ -21,7 +21,7 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parents[1]
 PLUGINS = {  # plugin -> file dung chung can chep kem
     "webchat": ["owui_mirror.py"],
-    "chatbot_guard": ["kb.py"],
+    "chatbot_guard": ["kb.py", "owui_mirror.py"],
 }
 CHAT_PLATFORMS = ["webchat"]
 KB_TOOLS = ["tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"]
