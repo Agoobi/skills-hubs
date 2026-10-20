@@ -60,6 +60,7 @@
   var polling = false, typing = false;
   function poll() {
     if (polling) return; polling = true;
+    var t0 = Date.now(), wasTyping = typing;
     fetch(API + "/api/messages?vid=" + state.vid + "&after=" + state.last + "&typing=" + (typing ? 1 : 0))
       .then(function (r) { return r.json(); })
       .then(function (j) {
@@ -68,14 +69,18 @@
         (j.messages || []).forEach(function (m) { add("bot", m.text, true); state.last = Math.max(state.last, m.seq); });
         save();
         typing = !!j.typing; typingEl.style.display = typing ? "block" : "none";
-        if (box.classList.contains("open") || typing) poll();
+        if (!((box.classList.contains("open") && state.log.length) || typing)) return;
+        // May chu tra ngay ma khong co tin (khach moi, bi gioi han toc do...): doi roi hoi lai, khong lap lien tuc
+        if (j.ok === false) setTimeout(poll, 15000);
+        else if (Date.now() - t0 < 1000 && !(j.messages || []).length && !!j.typing === wasTyping) setTimeout(poll, 3000);
+        else poll();
       })
       .catch(function () { polling = false; setTimeout(poll, 5000); });
   }
 
   btn.onclick = function () {
     box.classList.toggle("open");
-    if (box.classList.contains("open")) { input.focus(); poll(); }
+    if (box.classList.contains("open")) { input.focus(); if (state.log.length) poll(); } // khach moi: chua can hoi
   };
   box.querySelector("#hwc-form").onsubmit = function (e) {
     e.preventDefault();
