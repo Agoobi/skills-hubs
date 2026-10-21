@@ -1,5 +1,6 @@
 {
   "default_oa": "shop",
+  "image_host": { "dir": "/srv/www/shop/zalo-img", "url": "https://shop.vn/zalo-img" },
   "oas": {
     "shop": {
       "label": "Zalo OA Shop Mẫu",

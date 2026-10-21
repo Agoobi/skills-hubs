@@ -31,6 +31,7 @@ Mọi lệnh chạy bằng `python -I scripts/zalooa.py <lệnh>` từ thư mụ
    - **Có sẵn token** (admin lấy ở developers.zalo.me → Công cụ → API Explorer, loại *OA access token*): đặt env `ZALO_ACCESS_TOKEN`, `ZALO_REFRESH_TOKEN` rồi chạy `connect-import`. Script tự đọc `oa_id` và tên OA. Không dán token vào tham số dòng lệnh.
    - **OAuth**: `connect --redirect <callback URL>` → gửi link cho **chủ OA** (tài khoản Zalo có quyền admin OA) bấm Đồng ý. Zalo chuyển về callback URL kèm `?code=...&oa_id=...`; chủ OA copy nguyên URL trên thanh địa chỉ gửi lại → `connect-finish "<URL>"`. Link hết hạn sau 30 phút.
 3. Copy `settings.example.json` thành `settings.json`, điền `oa_id` (bước 2 in ra), giọng văn, tác giả. Xem `references/viet-bai.md`.
+   Muốn user gửi ảnh trên máy: điền `image_host` = một thư mục mà web server của shop phục vụ công khai qua https (`dir`) và URL tương ứng (`url`), vd Caddy `file_server` trên VPS chạy Hermes. Zalo chép ảnh sang máy chủ của Zalo ngay khi tạo bài, nên thư mục chỉ cần truy cập được lúc tạo/sửa bài. Không dùng dịch vụ lưu ảnh công khai của bên thứ ba.
 4. `check --oa <alias>`: kiểm tra token, tên OA, quyền đọc bài viết.
 
 `settings.json` **không** chứa token. Token lưu ở `~/.hermes/zalo/tokens.json` (`$ZALO_TOKEN_FILE`, quyền 600, có khóa file), tự làm mới trước khi hết hạn. Access token sống khoảng 24 giờ; refresh token **chỉ dùng được 1 lần** (mỗi lần làm mới Zalo trả cặp mới, cặp cũ chết), nên không dùng cùng refresh token ở nơi khác sau khi đã nạp vào skill. Refresh token hết hạn sau khoảng 3 tháng không dùng; khi đó kết nối lại (bước 2).
@@ -43,20 +44,26 @@ Bắt đầu: `oas`. OA nào `ket_noi: CHUA` → làm phần Cài đặt rồi d
 
 **Gate 2 — Nội dung.** Hỏi gọn trong 1 lượt: chủ đề, mục tiêu (ưu đãi, tin tức, hướng dẫn, chăm sóc khách), thông tin thật (sản phẩm, giá, ưu đãi, thời hạn, điều kiện), CTA, độ dài. Thiếu thì hỏi lại.
 
-**Gate 3 — Ảnh bìa.** Bắt buộc 1 ảnh bìa là **URL https công khai** trả thẳng file ảnh (Zalo tải về rồi lưu sang `zadn.vn`; không nhận file trên máy). Một số host bị từ chối (`-201 photo_url is invalid`, đã gặp với Wikimedia và Picsum); ảnh trên website của shop hoặc Unsplash thì nhận. User đưa URL, hoặc đưa file rồi upload lên website bằng skill `viet-bai-website-wordpress` (`upload`) để lấy `url`. Ảnh trong bài cũng phải là URL https. Không dùng ảnh không rõ bản quyền.
+**Gate 3 — Ảnh.** Bài bắt buộc có **1 ảnh bìa**; ảnh trong bài tùy chọn. Hỏi user chọn cho từng loại:
+- **A. User đưa URL https** trả thẳng file ảnh.
+- **B. User đưa file trên máy** (jpg/png/webp/gif). Script tự chép vào `image_host` (thư mục web của shop, xem Cài đặt) rồi dùng URL đó. Chưa có `image_host` → upload lên website bằng skill `viet-bai-website-wordpress` (`upload`) lấy `url`, hoặc nhờ admin cấu hình `image_host`.
+- **C. Agent tạo ảnh** bằng công cụ có sẵn trong môi trường (nếu có): viết prompt, user duyệt trước khi tạo, rồi dùng như B. Không có công cụ → nói rõ, quay về A/B.
+- **D. Không có ảnh trong bài** (ảnh bìa vẫn bắt buộc).
 
-**Gate 4 — Bản nháp.** Viết theo `references/viet-bai.md` và cấu hình OA, lưu `drafts/<ten>.md` (dòng đầu `# Tiêu đề`, tối đa 150 ký tự). Bài tạo qua API **chỉ có chữ thô**: không đậm, nghiêng, link bấm được; nhấn mạnh bằng cách tách đoạn, emoji, tiêu đề mục. Kèm mô tả ngắn (≤ 300 ký tự, hiện ở danh sách bài và khi chia sẻ). Hiển thị nguyên văn, lặp đến khi user nói "ok".
+Mỗi ảnh **≤ 1 MB** (lớn hơn: Zalo nhận lệnh nhưng lỗi khi xử lý). Ảnh trong bài: dòng riêng `![chú thích](URL hoặc file)` trong file nội dung. Một số host bị Zalo từ chối (đã gặp Wikimedia, Picsum); ảnh trên website của shop hoặc Unsplash thì nhận. Không dùng ảnh không rõ bản quyền. User xác nhận ảnh cuối cùng.
 
-**Gate 5 — Duyệt cuối.** Tóm tắt: OA, tiêu đề, mô tả, tác giả, ảnh bìa, bật/tắt bình luận, trạng thái **ẨN**. Hỏi: "Tạo bài (ẩn) trên Zalo OA nhé?" Chỉ chạy khi user đồng ý.
+**Gate 4 — Bản nháp.** Viết **1-2 phương án** theo `references/viet-bai.md` và cấu hình OA (`brand_voice`, `audience`, `default_cta`, `avoid`, `length`); mỗi phương án kèm mô tả ngắn (≤ 300 ký tự, hiện ở danh sách bài và khi chia sẻ). Bài tạo qua API **chỉ có chữ thô**: không đậm, nghiêng, link bấm được; nhấn mạnh bằng cách tách đoạn, emoji, tiêu đề mục. Hiển thị nguyên văn, hỏi: chọn phương án nào? sửa gì? Lặp đến khi user nói "ok", rồi lưu bản chốt vào `drafts/<ten>.md` (dòng đầu `# Tiêu đề`, tối đa 150 ký tự).
+
+**Gate 5 — Duyệt cuối.** Chạy `validate` (cùng tham số với `draft`; không gửi gì lên Zalo): kiểm độ dài, tải thử từng ảnh (có phải ảnh, ≤ 1 MB, có chuyển hướng không) và in `preview` đúng như bài sẽ hiện. Có `errors` → sửa rồi chạy lại; có `warnings` → báo user. Gửi user preview kèm: OA, tiêu đề, mô tả, tác giả, ảnh bìa, bình luận bật/tắt, trạng thái **ẨN**. Hỏi: "Tạo bài (ẩn) trên Zalo OA nhé?" Chỉ chạy `draft` khi user đồng ý.
 
 **Bàn giao.**
 
 ```
-python -I scripts/zalooa.py draft --oa <alias> --content-file drafts/<ten>.md --cover <URL https> \
+python -I scripts/zalooa.py draft --oa <alias> --content-file drafts/<ten>.md --cover <URL https | file> \
   --description "<mô tả ngắn>" [--author "<tác giả>"] [--comment show|hide]
 ```
 
-Script tạo bài (`article/create`), chờ Zalo xử lý xong (`POST article/verify`) rồi trả `id`. Bài nằm trong `list` với `status: hide`. Gửi user: tiêu đề, `id`, trạng thái ẩn, trang quản lý `https://oa.zalo.me` → Bài viết. Nhắc: "Bạn mở trang quản lý bài viết của OA, xem trước, rồi bật Hiển thị hoặc gửi bài cho người quan tâm."
+Script kiểm ảnh lại (lỗi thì dừng, chưa gửi gì), chép ảnh trên máy vào `image_host`, tạo bài (`article/create`), chờ Zalo xử lý xong (`POST article/verify`), rồi **đọc lại bài và chỉ báo thành công khi Zalo xác nhận `status: hide`**. Gửi user: tiêu đề, `id`, trạng thái ẩn, trang quản lý `https://oa.zalo.me` → Bài viết. Nhắc: "Bạn mở trang quản lý bài viết của OA, xem trước, rồi bật Hiển thị hoặc gửi bài cho người quan tâm."
 
 ## Sửa bài đã tạo
 
@@ -73,5 +80,6 @@ Xem lại: `list`, `detail <id>`.
 - `-216` / `-124`: token sai, hết hạn → script tự làm mới 1 lần; vẫn lỗi thì chạy lại `connect`.
 - `-230`: OA chưa cấp quyền cho app → `connect` lại, nhắc chủ OA bật quyền bài viết.
 - `-201`: tham số sai (tiêu đề / mô tả quá dài, ảnh bìa không tải được hoặc host bị Zalo từ chối → thử URL ảnh khác).
+- `-200 Upload media failed` lúc verify: ảnh > 1 MB hoặc Zalo không tải được ảnh. Chạy `validate`, thu nhỏ ảnh.
 - Tạo xong mà chưa có `id` (Zalo xử lý chậm): chờ vài phút rồi `list`, không tạo lại để tránh trùng bài.
 - Lỗi khác: báo nguyên văn, không nói đã tạo bài khi chưa có `id`.

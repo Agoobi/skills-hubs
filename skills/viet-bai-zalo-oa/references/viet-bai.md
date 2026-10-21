@@ -29,7 +29,7 @@ Bài tạo qua API, Zalo bỏ mọi thẻ HTML và đổi xuống dòng thành d
 - Mỗi đoạn, mỗi ý danh sách (`• ý một`, `1. bước một`), mỗi trích dẫn là một khối riêng → hiện thành dòng riêng.
 - `##` thành dòng VIẾT HOA (không có tiêu đề hay chữ đậm).
 - `**đậm**`, `*nghiêng*` mất định dạng, chỉ còn chữ; `[chữ](URL)` thành `chữ (URL)`, link không bấm được.
-- Dòng chỉ có ảnh `![chú thích](URL https)` thành khối ảnh riêng; ảnh phải là URL công khai.
+- Dòng chỉ có ảnh `![chú thích](URL https hoặc file)` thành khối ảnh riêng. File tính từ thư mục của file nội dung, cần `image_host`. Mỗi ảnh ≤ 1 MB.
 - Cần chữ đậm, link bấm được: chủ OA sửa trên oa.zalo.me trước khi hiện bài.
 
 ## settings.json (mỗi OA)
@@ -41,5 +41,6 @@ Bài tạo qua API, Zalo bỏ mọi thẻ HTML và đổi xuống dòng thành d
 | `author` | Tác giả mặc định (≤ 50 ký tự) |
 | `comment` | `show` / `hide`: cho phép bình luận |
 | `brand_voice`, `audience`, `default_cta`, `avoid`, `length` | Giọng văn và quy ước viết |
+| `image_host` | (gốc settings hoặc từng OA) `{"dir", "url"}`: thư mục web công khai để đăng ảnh trên máy |
 
 Biến môi trường: `ZALO_APP_ID`, `ZALO_APP_SECRET` (bắt buộc khi kết nối và làm mới token), `ZALO_TOKEN_FILE` (tùy chọn), `ZALO_ACCESS_TOKEN` + `ZALO_REFRESH_TOKEN` (chỉ cho `connect-import`).

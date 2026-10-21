@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Cong cu cho skill viet-bai-zalo-oa. Chi dung thu vien chuan.
 
-Lenh: oas | connect | connect-finish | connect-import | check | draft | update | list | detail
+Lenh: oas | connect | connect-finish | connect-import | check | validate | draft | update | list | detail
 Bai luon tao o trang thai AN (status=hide): chu OA tu kiem tra va bat hien thi tren oa.zalo.me.
 KHONG co lenh dang/hien bai, khong co lenh xoa. Ket qua in ra JSON de agent doc.
 Token OA luu qua zalo_tokens.py (file ~/.hermes/zalo/tokens.json).
 """
-import argparse, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
+import argparse, hashlib, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -19,6 +19,8 @@ API = os.getenv("ZALO_ARTICLE_API") or "https://openapi.zalo.me/v2.0"  # env de 
 LIMITS = {"title": 150, "author": 50, "description": 300}
 TOKEN_ERRORS = {-216, -124, -230}
 LIST_ITEM = re.compile(r"^([-*+]|\d+[.)])\s+")
+MAX_IMAGE = 1024 * 1024  # anh > 1 MB: create van nhan nhung Zalo loi luc xu ly (da kiem)
+IMAGE_TYPES = (".jpg", ".jpeg", ".png", ".webp", ".gif")
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -60,7 +62,7 @@ def oa_of(cfg, alias):
         die(f"Khong co OA '{alias}'. OA da cau hinh: {list(cfg.get('oas') or {})}")
     if not str(o.get("oa_id", "")).isdigit():
         die(f"OA '{alias}': oa_id chua dung. Ket noi OA (connect) roi xem oa_id bang lenh oas.")
-    return dict(o, alias=alias, oa_id=str(o["oa_id"]))
+    return dict(o, alias=alias, oa_id=str(o["oa_id"]), image_host=o.get("image_host") or cfg.get("image_host"))
 
 
 # ---------------------------------------------------------------- goi API
@@ -134,9 +136,8 @@ def md_to_body(md):
             continue
         img = re.fullmatch(r"!\[([^\]]*)\]\(([^)\s]+)\)", st)
         if img:
-            if not img[2].startswith("https://"):
-                die(f"Anh trong bai phai la URL https cong khai (Zalo tu tai ve): {img[2]}")
             flush()
+            # URL https hoac duong dan file tren may (publish_images tai len image_host truoc khi gui)
             items.append({"type": "image", "url": img[2], "caption": img[1]})
             continue
         m = re.match(r"^#{1,6}\s+(.*)$", st)
@@ -165,7 +166,11 @@ def read_content(path):
     m = re.match(r"^\s*#\s+(.+)\n", text)
     if m:
         title, text = m[1].strip(), text[m.end():]
-    return title, md_to_body(text)
+    body = md_to_body(text)
+    for b in body:  # anh tren may: duong dan tinh tu thu muc cua file noi dung
+        if b["type"] == "image" and not is_url(b["url"]):
+            b["url"] = str((Path(path).parent / b["url"]).resolve())
+    return title, body
 
 
 def check_limits(art):
@@ -177,10 +182,93 @@ def check_limits(art):
         die("Thieu tieu de: --title hoac dong '# Tieu de' dau file.")
     if not art.get("body"):
         die("Thieu noi dung: --content-file <file.md>.")
-    cover = (art.get("cover") or {}).get("photo_url", "")
-    if not cover.startswith("https://"):
-        die("Anh bia (--cover) bat buoc va phai la URL https cong khai. Anh o may: upload len website "
-            "(vd skill viet-bai-website-wordpress, lenh upload) roi dung source_url.")
+    if not (art.get("cover") or {}).get("photo_url"):
+        die("Thieu anh bia (--cover): URL https hoac file anh tren may.")
+
+
+# ---------------------------------------------------------------- anh
+# Bai viet chi nhan URL https cong khai (attachment_id cua oa/upload/image bi tu choi, da kiem).
+# Zalo tai anh ve va luu sang zadn.vn ngay khi tao bai, nen URL goc chi can song den luc do.
+
+def is_url(v):
+    return v.startswith("https://")
+
+
+def image_slots(art):
+    """(dict, key) cua tung anh trong bai: anh bia + cac khoi image."""
+    slots = [(art["cover"], "photo_url")] if art.get("cover") else []
+    return slots + [(b, "url") for b in art.get("body") or [] if b.get("type") == "image"]
+
+
+def check_local(path):
+    p = Path(path)
+    if not p.is_file():
+        return f"Khong thay file anh: {path}"
+    if p.suffix.lower() not in IMAGE_TYPES:
+        return f"{p.name}: chi nhan {', '.join(IMAGE_TYPES)}"
+    if p.stat().st_size > MAX_IMAGE:
+        return f"{p.name}: {p.stat().st_size // 1024} KB, Zalo chi nhan anh <= 1 MB: nen/thu nho anh lai."
+    return None
+
+
+def check_url(url):
+    """Tai thu header cua URL anh. Tra (loi, canh bao)."""
+    if not is_url(url):
+        return f"Anh phai la URL https: {url}", None
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (agoobi-zalooa-skill)"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            ctype, size, final = r.headers.get("Content-Type", ""), r.headers.get("Content-Length"), r.geturl()
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return f"Khong tai duoc anh {url}: {e}", None
+    if not ctype.startswith("image/"):
+        return f"URL khong tra ve file anh (Content-Type {ctype or 'trong'}): {url}", None
+    if size and int(size) > MAX_IMAGE:
+        return f"Anh {int(size) // 1024} KB > 1 MB, Zalo se loi khi xu ly: {url}", None
+    warn = None
+    if urllib.parse.urlparse(final).netloc != urllib.parse.urlparse(url).netloc:
+        warn = f"URL chuyen huong sang host khac ({final}), Zalo hay tu choi: nen dung link truc tiep."
+    return None, warn
+
+
+def check_images(oa, art):
+    errors, warnings = [], []
+    for slot, key in image_slots(art):
+        v = slot[key]
+        if is_url(v):
+            err, warn = check_url(v)
+        else:
+            err, warn = check_local(v), None
+            if not err and not image_host_ready(oa):
+                err = (f"Anh tren may {Path(v).name} can image_host trong settings.json (thu muc web cua shop) "
+                       "hoac upload len website roi dung URL.")
+        errors += [err] if err else []
+        warnings += [warn] if warn else []
+    return list(dict.fromkeys(errors)), list(dict.fromkeys(warnings))  # 1 anh dung 2 cho: bao 1 lan
+
+
+def image_host_ready(oa):
+    h = oa.get("image_host") or {}
+    return bool(h.get("dir") and is_url(h.get("url", "")))
+
+
+def publish_images(oa, art):
+    """Chep anh tren may vao image_host.dir va thay bang URL cong khai tuong ung."""
+    h = oa.get("image_host") or {}
+    for slot, key in image_slots(art):
+        p = Path(slot[key])
+        if is_url(slot[key]):
+            continue
+        data = p.read_bytes()
+        name = hashlib.sha256(data).hexdigest()[:24] + p.suffix.lower()
+        dest = Path(h["dir"]).expanduser()
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / name).write_bytes(data)
+        os.chmod(dest / name, 0o644)
+        slot[key] = h["url"].rstrip("/") + "/" + name
+        err, _ = check_url(slot[key])
+        if err:
+            die(f"Da chep anh vao {dest} nhung URL chua truy cap duoc: {err}. Kiem tra image_host.url.")
 
 
 def build(oa, a, base=None):
@@ -198,9 +286,8 @@ def build(oa, a, base=None):
     if a.author:
         art["author"] = a.author
     if a.cover:
-        if not re.match(r"^https?://", a.cover):
-            die("--cover phai la URL https cong khai (khong nhan file tren may).")
-        art["cover"] = {"cover_type": "photo", "photo_url": a.cover, "status": "show"}
+        cover = a.cover if is_url(a.cover) else str(Path(a.cover).resolve())
+        art["cover"] = {"cover_type": "photo", "photo_url": cover, "status": "show"}
     if a.comment:
         art["comment"] = a.comment
     art["status"] = "hide"  # luon an: chu OA tu bat hien thi
@@ -220,6 +307,9 @@ def verify(oa, token):
         last = call(oa, "POST", "/article/verify", body={"token": token})
         if last.get("error", 0) == 0 and (last.get("data") or {}).get("id"):
             return last["data"]["id"]
+        if "failed" in str(last.get("message", "")).lower():  # vd -200 "Upload media failed": anh > 1 MB
+            die(f"Zalo xu ly bai that bai: {last.get('error')} {last.get('message')}. Thuong do anh qua 1 MB "
+                "hoac Zalo khong tai duoc anh: chay validate.", token=token)
         time.sleep(2)
     die(f"Bai da gui nhung chua xac nhan duoc id: {last}. Kiem tra danh sach bai (list) sau it phut.",
         token=token)
@@ -282,9 +372,38 @@ def cmd_check(a):
          "loi_bai_viet": None if arts.get("error", 0) == 0 else f"{arts.get('error')} {arts.get('message')}"})
 
 
+def preview(art):
+    """Bai se hien the nao: moi khoi 1 dong, dung chu tron Zalo nhan duoc."""
+    lines = [f"[ANH] {b['url']}" + (f" ({b['caption']})" if b.get("caption") else "") if b["type"] == "image"
+             else html.unescape(b["content"]) for b in art["body"]]
+    return {"title": art["title"], "description": art.get("description", ""), "author": art.get("author", ""),
+            "cover": art["cover"]["photo_url"], "comment": art.get("comment"), "status": art["status"],
+            "body": lines}
+
+
+def ready(oa, art):
+    """Kiem tra anh truoc khi gui; loi -> dung, khong tao bai."""
+    errors, warnings = check_images(oa, art)
+    if errors:
+        die("Bai chua gui duoc: " + " | ".join(errors), warnings=warnings)
+    return warnings
+
+
+def cmd_validate(a):
+    oa = oa_of(load(), a.oa)
+    art = build(oa, a)
+    errors, warnings = check_images(oa, art)
+    out({"ok": not errors, "oa": oa["alias"], "errors": errors, "warnings": warnings, "preview": preview(art),
+         "next": "Sua loi roi chay lai validate." if errors else "Hien preview cho user duyet (Gate 5)."})
+    if errors:
+        sys.exit(1)
+
+
 def cmd_draft(a):
     oa = oa_of(load(), a.oa)
     art = build(oa, a)
+    ready(oa, art)
+    publish_images(oa, art)
     data = ok_or_die(call(oa, "POST", "/article/create", body=art), "tao bai")
     token = data.get("token")
     if not token:
@@ -307,6 +426,8 @@ def cmd_update(a):
         die(f"Bai {a.id} khong o trang thai AN (status={detail.get('status')!r}): khong sua bang skill. "
             "Chu OA an bai truoc hoac sua tren oa.zalo.me.")
     art = build(oa, a, json.loads(f.read_text(encoding="utf-8")))
+    ready(oa, art)
+    publish_images(oa, art)
     data = ok_or_die(call(oa, "POST", "/article/update", body={**art, "id": a.id}), "sua bai")
     if data.get("token"):
         verify(oa, data["token"])
@@ -356,9 +477,12 @@ def main():
         p.add_argument("--content-file", help=".md, dong '# Tieu de' dau file = tieu de")
         p.add_argument("--description", help="Mo ta ngan (<= 300 ky tu)")
         p.add_argument("--author")
-        p.add_argument("--cover", help="URL https anh bia")
+        p.add_argument("--cover", help="Anh bia: URL https hoac file tren may (can image_host)")
         p.add_argument("--comment", choices=["show", "hide"])
 
+    p = sp.add_parser("validate", help="Kiem tra bai + anh, in preview; khong gui gi len Zalo")
+    art_args(p)
+    p.set_defaults(f=cmd_validate)
     p = sp.add_parser("draft", help="Tao bai (trang thai AN)")
     art_args(p)
     p.set_defaults(f=cmd_draft)
