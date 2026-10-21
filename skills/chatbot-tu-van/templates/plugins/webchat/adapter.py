@@ -46,6 +46,8 @@ def guard_text(platform: str, user_id: str, text: str) -> str:
 # Thong bao loi cua Hermes (het han key, provider loi, qua tai...) gui qua send() nhu tin thuong: khong cho toi khach.
 SYSTEM_ERROR = re.compile(r"^\s*(❌|⚠️|🚫)|Provider said|rejected (the|your) (request|API key)|hermes setup|"
                           r"Settings → Providers|Your request was not processed", re.I)
+# Thong bao dieu khien cua Hermes (dang ban, ngat, meo dung lenh): khong phai cau tra loi, bo han.
+CONTROL_NOTICE = re.compile(r"^\s*(⚡|💡|⏳|🔄|⏸)|Interrupting current task|/busy|/queue|/steer|First-time tip", re.I)
 SYSTEM_ERROR_TEXT = ("Dạ hệ thống tư vấn đang bận một chút. Anh/chị để lại tên và số điện thoại, "
                      "nhân viên bên em sẽ liên hệ ngay ạ.")
 
@@ -138,6 +140,9 @@ class WebchatAdapter(BasePlatformAdapter):
         vid = chat_id.removeprefix("web-")
         if not chat_id.startswith("web-") or not VID_RE.match(vid):  # vd kenh nha "none" cua cron
             return SendResult(success=False, error=f"webchat: chat_id khong hop le {chat_id!r}")
+        if CONTROL_NOTICE.search(content or ""):
+            logger.info("[webchat] bo thong bao dieu khien, khong gui khach: %s", (content or "")[:200])
+            return SendResult(success=True, message_id=f"{vid}:{self._seq[vid]}")
         if SYSTEM_ERROR.search(content or ""):
             logger.warning("[webchat] chan thong bao loi he thong, khong gui khach: %s", (content or "")[:300])
             if any(m["role"] == "bot" and m["text"] == SYSTEM_ERROR_TEXT for m in self._outbox[vid]

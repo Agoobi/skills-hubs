@@ -29,7 +29,9 @@ ACTIONS = {"da_goi": "Đã gọi", "xong": "Xong", "mo_lai": "Mở lại"}
 PROFILE = [("ten", "Tên"), ("sdt", "SĐT"), ("zalo", "Zalo"), ("email", "Email"), ("cong_ty", "Công ty"),
            ("dia_chi", "Địa chỉ"), ("thoi_gian", "Giờ tiện gọi"), ("nhu_cau", "Nhu cầu")]
 OVERVIEW_KEY = "__overview__"
-OVERVIEW_EVERY = 600  # giay: lam moi tong quan dinh ky (va 30 giay sau moi thay doi)
+OVERVIEW_EVERY = 600  # giay: lam moi tong quan dinh ky
+INDEX_DELAY = 2  # giay sau thay doi cuoi: ghi lai tong quan + chi muc cho trang Hop thu (gop nhieu thay doi)
+INDEX_MAX = 500  # so khach toi da trong chi muc (moi nhat)
 TZ = timezone(timedelta(hours=7))
 RETRY = (2, 5, 15, 30, 60)
 NS = uuid.UUID("6f1c2a52-6a0e-4d7c-9a51-0c0ffee0a11b")
@@ -105,8 +107,8 @@ class Inbox:
 
     def _worker(self):
         while True:
-            try:
-                item = self.q.get(timeout=5)
+            try:  # co thay doi chua ghi chi muc: chi cho toi INDEX_DELAY
+                item = self.q.get(timeout=INDEX_DELAY if self._dirty_at else 5)
             except queue.Empty:
                 item = None
             if item:
@@ -121,7 +123,7 @@ class Inbox:
                     logger.error("[owui-inbox] bo qua %s %s sau %d lan thu", item[0], item[1], len(RETRY) + 1)
                     self._folders = {}
                 self.q.task_done()
-            due = self._dirty_at and time.time() - self._dirty_at > 30
+            due = self._dirty_at and time.time() - self._dirty_at > INDEX_DELAY
             if self.q.empty() and (due or time.time() - self._overview_at > OVERVIEW_EVERY):
                 try:
                     self._overview()
@@ -214,6 +216,9 @@ class Inbox:
             if p["role"] == "user" and not st.get("first_q"):
                 st["first_q"] = p["text"][:60]
             new.append((p["role"], p["text"], None))
+            st["last_text"], st["last_role"] = p["text"][:160], p["role"]
+            if p["role"] == "user":
+                st["last_user_at"] = p["t"]
             if st["status"] == "da_xong" and p["role"] == "user":
                 st["status"] = "dang_chat"  # khach quay lai: mo lai
         elif kind == "event":
@@ -285,8 +290,7 @@ class Inbox:
         data[conv] = st
         self._save(data)
         self._emit(chat_id, hist.get("currentId") or card_id, title)
-        if kind != "message" or st["msgs"] <= 2:
-            self._dirty_at = self._dirty_at or time.time()
+        self._dirty_at = self._dirty_at or time.time()  # chi muc cua trang Hop thu nam trong chat Tong quan
 
     @staticmethod
     def _linear(hist):
@@ -350,6 +354,19 @@ class Inbox:
 
     # ---------------------------------------------------------------- tong quan
 
+    def _index(self, convs):
+        """Chi muc cho trang Hop thu (openwebui-custom/static/hop-thu): 1 dong / khach, moi nhat truoc.
+        Hop dong du lieu: docs/dong-bo.md cua repo openwebui-custom."""
+        rows = sorted(convs.items(), key=lambda kv: -(kv[1].get("last_at") or 0))[:INDEX_MAX]
+        return {"v": 1, "updated_at": _now(), "shop": self.shop,
+                "action_url": (self.public_url + "/owui/action") if self.public_url else "",
+                "items": [{"conv": k, "chat_id": v["chat_id"], "kenh": k.split(":")[0], "title": v.get("title"),
+                           "status": v["status"], "profile": v.get("profile") or {}, "page": v.get("page"),
+                           "first_q": v.get("first_q"), "last_text": v.get("last_text"), "last_role": v.get("last_role"),
+                           "first_at": v.get("first_at"), "last_at": v.get("last_at"), "last_user_at": v.get("last_user_at"),
+                           "n": v.get("n", 0), "msgs": v.get("msgs", 0), "blocked": v.get("blocked", 0), "note": v.get("note"),
+                           "events": v.get("events", [])[-5:], "sig": self.sign(k)} for k, v in rows]}
+
     def _overview(self):
         data = self._load()
         convs = {k: v for k, v in data.items() if k != OVERVIEW_KEY and v.get("chat_id")}
@@ -387,7 +404,7 @@ class Inbox:
         mid = self._mid(OVERVIEW_KEY, 0)
         msg = self._msg(mid, "assistant", text, None, _now(), [page])
         chat = {"title": "Tổng quan hộp thư", "models": [self.model], "messages": [msg],
-                "history": {"messages": {mid: msg}, "currentId": mid}}
+                "history": {"messages": {mid: msg}, "currentId": mid}, "cqf_inbox": self._index(convs)}
         if ov.get("chat_id"):
             try:
                 self._req("POST", f"/api/v1/chats/{ov['chat_id']}", {"chat": chat})

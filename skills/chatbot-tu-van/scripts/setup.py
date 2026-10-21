@@ -27,7 +27,8 @@ CHAT_PLATFORMS = ["webchat"]
 KB_TOOLS = ["tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"]
 QUIET = {"tool_progress": "off", "interim_assistant_messages": False, "long_running_notifications": False,
          "busy_ack_detail": False, "busy_steer_ack_enabled": False, "show_reasoning": False,
-         "streaming": False, "live_status": "off", "thinking_progress": False}
+         "streaming": False, "live_status": "off", "thinking_progress": False,
+         "busy_input_mode": "queue"}  # khach nhan don dap: xep hang, khong gui "⚡ Interrupting current task"
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
