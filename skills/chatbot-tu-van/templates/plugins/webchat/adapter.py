@@ -5,12 +5,13 @@ Khach dan 1 the script len website:
 widget.js goi:
     POST /api/chat       {"vid": "<id trinh duyet>", "text": "..."}  -> 202
     GET  /api/messages?vid=...&after=<seq>                          -> long-poll cau tra loi
-    POST /owui/action    {"conv", "sig", "action"}  <- nut tren the khach trong Open WebUI (ky HMAC)
-Moi vid la 1 phien Hermes rieng. Hoi thoai duoc chep vao hop thu Open WebUI (owui_inbox.py).
+Moi vid la 1 phien Hermes rieng. Hoi thoai va lead luu o hop thu cua Hermes (inbox.py); trang "Hop thu" mo trong
+Open WebUI doc qua /inbox/api/* (dang nhap bang token Open WebUI, Hermes hoi lai Open WebUI de xac thuc).
 
 Cau hinh: $CHATBOT_HOME/settings.json > webchat {host, port, allowed_origins, title, color, greeting}.
 """
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -25,9 +26,11 @@ from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, SendResult
 
 try:
-    from .owui_inbox import get_inbox
+    from .inbox import get_inbox
 except ImportError:  # setup.py chua chep file
     get_inbox = None
+
+INBOX_AUTH_TTL = 60  # giay: nho ket qua xac thuc token Open WebUI
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +95,11 @@ class WebchatAdapter(BasePlatformAdapter):
         self.port = int(os.getenv("WEBCHAT_PORT") or self.cfg.get("port") or 8650)
         self.origins = set(self.cfg.get("allowed_origins") or [])
         self.inbox = get_inbox(chatbot_home(), s) if get_inbox else None
+        ow = s.get("open_webui") or {}
+        self.owui_url = (ow.get("url") or "").rstrip("/")  # Hermes goi de xac thuc token (vd http://127.0.0.1:8080)
+        self.owui_origin = (ow.get("public_url") or "").rstrip("/")  # trang Hop thu chay o origin nay (CORS)
+        self.owui_roles = set(ow.get("roles") or ["admin"])
+        self._auth_cache: Dict[str, Any] = {}
         self._outbox: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
         # seq bat dau tu thoi diem tao: sau khi khoi dong lai / don dep, seq moi luon lon hon seq cu cua trinh duyet
         self._seq: Dict[str, int] = defaultdict(lambda: int(time.time()) * 1000)
@@ -117,7 +125,10 @@ class WebchatAdapter(BasePlatformAdapter):
         app.router.add_route("OPTIONS", "/api/{tail:.*}", self._preflight)
         app.router.add_post("/api/chat", self._chat)
         app.router.add_get("/api/messages", self._messages)
-        app.router.add_post("/owui/action", self._owui_action)
+        app.router.add_route("OPTIONS", "/inbox/api/{tail:.*}", self._inbox_preflight)
+        app.router.add_get("/inbox/api/index", self._inbox_index)
+        app.router.add_get("/inbox/api/conv", self._inbox_conv)
+        app.router.add_post("/inbox/api/action", self._inbox_action)
         app.router.add_get("/health", lambda _: web.json_response({"ok": True, "platform": PLATFORM}))
         self._runner = web.AppRunner(app)
         await self._runner.setup()
@@ -264,19 +275,88 @@ class WebchatAdapter(BasePlatformAdapter):
         task.add_done_callback(self._background_tasks.discard)
         return self._cors(request, web.json_response({"ok": True, "seq": seq}, status=202))
 
-    async def _owui_action(self, request):
-        """Nut tren the khach (iframe sandbox cua Open WebUI, Origin "null"): xac thuc bang chu ky theo tung chat."""
+    # ---------------------------------------------------------------- API cho trang Hop thu
+
+    def _inbox_cors(self, request, resp):
+        if self.owui_origin and request.headers.get("Origin", "") == self.owui_origin:
+            resp.headers["Access-Control-Allow-Origin"] = self.owui_origin
+            resp.headers["Vary"] = "Origin"
+            resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+            resp.headers["Access-Control-Max-Age"] = "600"
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    async def _inbox_preflight(self, request):
         from aiohttp import web
-        headers = {"Access-Control-Allow-Origin": "*"}
-        if not self._rate_ok("owui:" + self._client_ip(request), RATE):
-            return web.json_response({"ok": False, "error": "rate"}, status=429, headers=headers)
+        ok = bool(self.owui_origin) and request.headers.get("Origin", "") == self.owui_origin
+        return self._inbox_cors(request, web.Response(status=204 if ok else 403))
+
+    async def _inbox_user(self, request) -> Optional[dict]:
+        """Nguoi dang mo trang Hop thu: hoi Open WebUI token nay cua ai. Chi nhan vai tro trong open_webui.roles."""
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if not token or not self.owui_url or token.startswith("sk-"):  # khong nhan API key, chi phien dang nhap
+            return None
+        key = hashlib.sha256(token.encode()).hexdigest()
+        hit = self._auth_cache.get(key)
+        if hit and hit[1] > time.time():
+            return hit[0]
+        import aiohttp
+        user = None
         try:
-            body = json.loads(await request.text())
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+                async with s.get(self.owui_url + "/api/v1/auths/", headers={"Authorization": f"Bearer {token}"}) as r:
+                    if r.status == 200:
+                        me = await r.json()
+                        if me.get("role") in self.owui_roles:
+                            user = {"id": me.get("id"), "name": me.get("name") or me.get("email") or ""}
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+            logger.warning("[webchat] khong xac thuc duoc voi Open WebUI: %s", e)
+            return None  # khong nho loi mang
+        if len(self._auth_cache) > 500:
+            self._auth_cache.clear()
+        self._auth_cache[key] = (user, time.time() + (INBOX_AUTH_TTL if user else 10))
+        return user
+
+    async def _inbox_guard(self, request):
+        from aiohttp import web
+        if not self.inbox:
+            return None, self._inbox_cors(request, web.json_response({"ok": False, "error": "inbox"}, status=503))
+        if not self._rate_ok("inbox:" + self._client_ip(request), RATE_POLL):
+            return None, self._inbox_cors(request, web.json_response({"ok": False, "error": "rate"}, status=429))
+        user = await self._inbox_user(request)
+        if not user:
+            return None, self._inbox_cors(request, web.json_response({"ok": False, "error": "auth"}, status=401))
+        return user, None
+
+    async def _inbox_index(self, request):
+        from aiohttp import web
+        user, err = await self._inbox_guard(request)
+        if err:
+            return err
+        return self._inbox_cors(request, web.json_response({"ok": True, "me": user["name"], **self.inbox.index()}))
+
+    async def _inbox_conv(self, request):
+        from aiohttp import web
+        user, err = await self._inbox_guard(request)
+        if err:
+            return err
+        data = self.inbox.conversation(request.query.get("c", ""))
+        if data is None:
+            return self._inbox_cors(request, web.json_response({"ok": False, "error": "not_found"}, status=404))
+        return self._inbox_cors(request, web.json_response({"ok": True, **data}))
+
+    async def _inbox_action(self, request):
+        from aiohttp import web
+        user, err = await self._inbox_guard(request)
+        if err:
+            return err
+        try:
+            body = await request.json()
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-            return web.json_response({"ok": False, "error": "json"}, status=400, headers=headers)
-        ok = bool(self.inbox) and self.inbox.action(str(body.get("conv", "")), str(body.get("action", "")),
-                                                   str(body.get("sig", "")))
-        return web.json_response({"ok": ok}, status=200 if ok else 403, headers=headers)
+            return self._inbox_cors(request, web.json_response({"ok": False, "error": "json"}, status=400))
+        ok = self.inbox.action(str(body.get("conv", "")), str(body.get("action", "")), user["name"])
+        return self._inbox_cors(request, web.json_response({"ok": ok}, status=200 if ok else 400))
 
     async def _messages(self, request):
         from aiohttp import web

@@ -11,7 +11,7 @@ import argparse, hashlib, json, os, subprocess, sys, time, urllib.error, urllib.
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-PLUGINS = {"webchat": ["owui_inbox.py"], "chatbot_guard": ["kb.py", "owui_inbox.py"]}
+PLUGINS = {"webchat": ["inbox.py"], "chatbot_guard": ["kb.py", "inbox.py"]}
 KB_TOOLS = {"tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"}
 PLACEHOLDER = ("DAN_", "_CUA_KHACH", "example.com", "shopmau.vn", "OA_SECRET_KEY_TRONG")
 
@@ -173,41 +173,19 @@ def check_data(home, chat, s, env):
         add("MCP kb", False, str(e), "Chay lai setup.py (chep kb.py)")
 
     ow = s.get("open_webui") or {}
-    if is_placeholder(ow.get("url")) or is_placeholder(ow.get("api_key")):
-        warn("Open WebUI", "Chua dien open_webui.url/api_key: hoi thoai se khong hien ben Open WebUI",
-             "Open WebUI > Settings > Account > API keys, dan vao settings.json")
+    if is_placeholder(ow.get("url")) or not str(ow.get("public_url") or "").startswith("https://"):
+        warn("Hop thu", "Chua dien open_webui.url / public_url: trang Hop thu trong Open WebUI se khong dang nhap duoc",
+             "url = dia chi Hermes goi toi Open WebUI (vd http://127.0.0.1:8080); public_url = https cua Open WebUI")
     else:
         try:
-            code, me = http("GET", ow["url"].rstrip("/") + "/api/v1/auths/", headers={"Authorization": f"Bearer {ow['api_key']}"})
-            add("Open WebUI", True, f"API key cua: {me.get('name') or me.get('email')}")
-            check_folders(ow)
+            code, _ = http("GET", ow["url"].rstrip("/") + "/health")
+            add("Hop thu", True, f"Open WebUI {ow['url']} tra loi; trang Hop thu mo tu {ow['public_url']}")
         except (urllib.error.URLError, OSError, ValueError) as e:
-            add("Open WebUI", False, f"{ow['url']}: {e}", "Kiem tra URL va API key (Admin phai bat API keys)")
+            add("Hop thu", False, f"{ow['url']}: {e}", "Kiem tra open_webui.url (Hermes phai goi duoc Open WebUI)")
 
     wc = s.get("webchat") or {}
     if not wc.get("allowed_origins") or any(is_placeholder(o) for o in wc["allowed_origins"]):
         add("webchat.allowed_origins", False, str(wc.get("allowed_origins")), "Dien domain website, vd https://shop.vn")
-    if not str(wc.get("public_url") or "").startswith("https://"):
-        warn("webchat.public_url", "Chua dien: the khach trong Open WebUI se khong co nut Da goi / Xong",
-             "Dien URL https cua bot, vd https://bot.shop.vn")
-
-
-def check_folders(ow):
-    """3 folder cua hop thu (Can xu ly / Dang chat / Da xong): chi doc, bot tu tao khi can."""
-    sys.path.insert(0, str(SKILL / "scripts"))
-    from owui_inbox import FOLDERS
-    try:
-        code, folders = http("GET", ow["url"].rstrip("/") + "/api/v1/folders/",
-                             headers={"Authorization": f"Bearer {ow['api_key']}"})
-    except (urllib.error.URLError, OSError, ValueError) as e:
-        add("Open WebUI folders", False, str(e), "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
-        return
-    have = {(f.get("name") or "").strip() for f in folders or [] if not f.get("parent_id")}
-    missing = [n for n in FOLDERS.values() if n not in have]
-    if missing:
-        warn("Open WebUI folders", f"Chua co {missing}: bot se tu tao khi co khach nhan", "")
-    else:
-        add("Open WebUI folders", True, ", ".join(FOLDERS.values()))
 
 
 def check_running(s, env):

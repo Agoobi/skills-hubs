@@ -14,9 +14,9 @@
     "max_passages": 5
   },
   "open_webui": {
-    "url": "https://chat.example.com",
-    "api_key": "sk-DAN_API_KEY_OPEN_WEBUI_CUA_KHACH",
-    "model_label": "Chatbot Shop Mẫu"
+    "url": "http://127.0.0.1:8080",
+    "public_url": "https://chat.shopmau.vn",
+    "roles": ["admin"]
   },
   "lead_webhook": {
     "url": "",

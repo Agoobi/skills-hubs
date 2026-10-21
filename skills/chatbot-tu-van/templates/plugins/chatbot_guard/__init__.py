@@ -13,12 +13,13 @@ thu_thap_khach (thong tin bot xin khach khi khong co cau tra loi).
 """
 from __future__ import annotations
 
+import contextvars
 import logging
 import re
 import threading
 import time
 
-from . import kb, owui_inbox
+from . import inbox, kb
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,13 @@ _by_user: dict = {}  # (platform, sender_id) -> session_id, cho outgoing()
 _index = None
 
 KB_TOOL = re.compile(r"^mcp_+kb_+")  # Hermes dat ten tool MCP: mcp__kb__tim_kien_thuc
+
+
+def _background(fn, *args):
+    """Chay fn o luong rieng MANG THEO ngu canh hien tai: gateway nhieu profile dat thu muc cua profile trong
+    contextvar; luong moi khong co no thi kb.home() tro ve profile mac dinh (ghi nham lead / hop thu)."""
+    ctx = contextvars.copy_context()
+    threading.Thread(target=ctx.run, args=(fn, *args), daemon=True).start()
 
 
 def _settings():
@@ -141,22 +149,22 @@ def on_tool(tool_name=None, args=None, result=None, session_id=None, **_):
         # MCP khong biet khach o kenh nao: ghi them su kien "nguon" de nhan vien tim dung cuoc tro chuyen
         evt = {"session": session_id, "kenh": turn.get("platform"), "khach_id": turn.get("sender"),
                "tool": KB_TOOL.sub("", tool_name), "args": args}
-        threading.Thread(target=_record_safe, args=("nguon", evt), daemon=True).start()
+        _background(_record_safe, "nguon", evt)
         kind = "lead" if tool_name.endswith("luu_khach_hang") else "handoff"
-        threading.Thread(target=_notify, args=(kind, turn.get("sender"), dict(args or {})), daemon=True).start()
+        _background(_notify, kind, turn.get("sender"), dict(args or {}))
     return None
 
 
 def _notify(kind, sender, data):
-    """Bao su kien vao chat cua chinh khach do trong hop thu Open WebUI: the su kien, chuyen sang nhom "Can xu ly"."""
+    """Ghi su kien vao hop thu cua Hermes (trang Hop thu): khach chuyen sang "Can xu ly"."""
     try:
         sender = str(sender or "")
         if not sender:
             return
         conv = "web:" + sender.removeprefix("web-") if sender.startswith("web-") else sender
-        owui_inbox.get_inbox(kb.home(), _settings()).event(conv, kind, data)
+        inbox.get_inbox(kb.home(), _settings()).event(conv, kind, data)
     except Exception as e:  # bao lead loi khong duoc anh huong cuoc tro chuyen
-        logger.warning("[chatbot_guard] khong bao duoc lead vao Open WebUI: %s", e)
+        logger.warning("[chatbot_guard] khong ghi duoc su kien vao hop thu: %s", e)
 
 
 def _record_safe(kind, data):
@@ -187,8 +195,8 @@ def _filter(text, turn, platform, session_id, where):
     logger.warning("[chatbot_guard] chan %s (so lieu khong co trong tai lieu: %s)", where, bad)
     evt = {"session": session_id, "platform": platform, "noi_chan": where, "khach_hoi": turn.get("user", ""),
            "bot_dinh_tra_loi": text, "so_lieu_khong_co_can_cu": bad}
-    threading.Thread(target=_record_safe, args=("guard_blocked", evt), daemon=True).start()
-    threading.Thread(target=_notify, args=("guard_blocked", turn.get("sender"), evt), daemon=True).start()
+    _background(_record_safe, "guard_blocked", evt)
+    _background(_notify, "guard_blocked", turn.get("sender"), evt)
     return kb.fallback_text(s)
 
 

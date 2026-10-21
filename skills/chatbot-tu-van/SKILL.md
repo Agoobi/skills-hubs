@@ -1,6 +1,6 @@
 ---
 name: chatbot-tu-van
-description: Chatbot tư vấn trên website, xem chat ở Open WebUI.
+description: Chatbot tư vấn trên website, chủ shop xem khách ở trang Hộp thư trong Open WebUI.
 version: 0.1.0
 author: Agoobi
 license: MIT
@@ -12,14 +12,14 @@ metadata:
 
 # chatbot-tu-van
 
-Biến một profile Hermes thành chatbot tư vấn khách hàng trên **website** (khung chat nhúng 1 dòng script), trả lời **chỉ từ tài liệu doanh nghiệp**. Mỗi khách là một cuộc trò chuyện riêng và được **chép sang Open WebUI** để chủ shop xem.
+Biến một profile Hermes thành chatbot tư vấn khách hàng trên **website** (khung chat nhúng 1 dòng script), trả lời **chỉ từ tài liệu doanh nghiệp**. Mỗi khách là một cuộc trò chuyện riêng; chủ shop xem và xử lý khách ở **trang Hộp thư** mở trong Open WebUI (Hermes lưu dữ liệu, không ghi chat nào vào Open WebUI).
 
 Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, các quy tắc không nằm ở file này mà nằm trong code (plugin), nên vẫn có hiệu lực dù model có đọc skill hay không:
 
 | Thành phần (cài vào `$HERMES_HOME/plugins/`) | Việc làm |
 |---|---|
 | `webchat` (kênh) | Phục vụ `widget.js`, nhận tin khách qua `/api/chat`, trả lời qua long-poll. Chặn domain lạ (CORS), giới hạn tốc độ. |
-| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản, thời hạn (ngày/tháng/năm…) không có trong tài liệu (thay bằng câu xin thông tin liên hệ và ghi sự kiện); không có thông tin thì nói chưa có và xin khách các thông tin trong `thu_thap_khach`; báo khách cần tư vấn vào folder lead của Open WebUI; bỏ dấu `/` để khách không gọi lệnh Hermes. |
+| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản, thời hạn (ngày/tháng/năm…) không có trong tài liệu (thay bằng câu xin thông tin liên hệ và ghi sự kiện); không có thông tin thì nói chưa có và xin khách các thông tin trong `thu_thap_khach`; đưa khách cần tư vấn vào mục Cần xử lý của Hộp thư; bỏ dấu `/` để khách không gọi lệnh Hermes. |
 | MCP `kb` (`chatbot/kb.py`) | 4 tool duy nhất của kênh chat: `tim_kien_thuc`, `doc_tai_lieu`, `luu_khach_hang`, `chuyen_nhan_vien`. Kênh chat **không có** terminal, file, web. Chỉ tìm trong file kiến thức **đã `verify`** và chưa bị sửa sau đó. |
 
 ## Quy tắc sắt
@@ -35,7 +35,7 @@ Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, 
 Lệnh chạy từ thư mục skill. `setup.py` và `check.py` cần Python của Hermes (có PyYAML), ví dụ `~/.hermes/hermes-agent/venv/bin/python`; gọi tắt là `HPY` bên dưới. `kb.py`, `eval.py` chỉ cần Python 3.
 
 **Gate 1 — Thu thập (hỏi user 1 lượt, thiếu thì hỏi lại, không đoán).**
-Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI + API key của tài khoản sẽ xem hội thoại; folder chứa chat của khách và folder báo khách cần tư vấn (tên hoặc link folder, tùy chọn); khi bot không có thông tin thì xin khách gì (`ten`, `sdt`, `email`, `zalo`, `dia_chi`, `cong_ty`, `thoi_gian`, hoặc không xin mà mời gọi hotline); tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
+Tên profile Hermes; tên doanh nghiệp, hotline, số Zalo liên hệ, giờ làm việc, website; domain website sẽ gắn khung chat; domain cho bot (vd `bot.shop.vn`, trỏ về máy chạy Hermes); URL Open WebUI (nơi mở trang Hộp thư) và vai trò được xem (mặc định admin); khi bot không có thông tin thì xin khách gì (`ten`, `sdt`, `email`, `zalo`, `dia_chi`, `cong_ty`, `thoi_gian`, hoặc không xin mà mời gọi hotline); tài liệu (docx, xlsx, csv, md, txt, pdf có chữ).
 
 **Gate 2 — Cài.**
 
@@ -55,7 +55,7 @@ Script chép plugin, ghi `config.yaml` (bật plugin, MCP `kb`, giới hạn too
 4. `$KB verify`: mọi con số (giá, %, số ngày, SĐT, mã...) phải có trong file nguồn đã ghi. File lỗi thì bot không dùng; sửa theo nguồn rồi chạy lại.
 5. `$KB status` phải `ok`. Không cần restart.
 
-**Gate 5 — Hạ tầng** (admin làm theo `references/trien-khai.md`): reverse proxy HTTPS cho `bot.shop.vn` vào cổng 8650; bật API key ở Open WebUI.
+**Gate 5 — Hạ tầng** (admin làm theo `references/trien-khai.md`): reverse proxy HTTPS cho `bot.shop.vn` vào cổng 8650; cài `Agoobi/openwebui-custom` lên Open WebUI với `HERMES_INBOX_URL=https://bot.shop.vn`.
 
 **Gate 6 — Khởi động và kiểm tra.**
 
@@ -78,7 +78,7 @@ python3 scripts/eval.py --profile <ten> [--cases <file-cau-hoi-rieng.json>]
 <script src="https://bot.shop.vn/widget.js" defer></script>
 ```
 
-Kèm: hộp thư ở Open WebUI (tài khoản sở hữu API key): chat ghim **Tổng quan hộp thư**, folder **Cần xử lý / Đang chat / Đã xong**, mỗi khách 1 chat có thẻ khách và nút Đã gọi / Xong (chi tiết: `references/trien-khai.md`). Giao diện gọn hơn và bấm dòng trong Tổng quan để mở chat: cài `Agoobi/openwebui-custom`. Trả lời trong Open WebUI **không** tới khách. Lead còn lưu ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
+Kèm: chủ shop mở Open WebUI, bấm **Hộp thư** ở sidebar: danh sách khách (Cần xử lý / Đang chat / Đã xong), hội thoại, thông tin khách, nút Đã gọi / Xong / Mở lại (chi tiết: `references/trien-khai.md`). Chưa trả lời khách từ Hộp thư được: gọi lại theo số khách để lại. Lead còn lưu ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
 
 ## Cập nhật kiến thức (user gửi tài liệu mới bất cứ lúc nào)
 
@@ -88,12 +88,12 @@ Kèm: hộp thư ở Open WebUI (tài khoản sở hữu API key): chat ghim **T
 
 ## Bảo trì
 
-- Bot trả lời "chưa có thông tin" nhiều: xem folder lead trong Open WebUI hoặc `leads.jsonl` (loại `guard_blocked`) để biết khách hỏi gì, hỏi user bổ sung tài liệu, chạy lại `eval.py`.
+- Bot trả lời "chưa có thông tin" nhiều: xem mục Cần xử lý trong Hộp thư hoặc `leads.jsonl` (loại `guard_blocked`) để biết khách hỏi gì, hỏi user bổ sung tài liệu, chạy lại `eval.py`.
 - Cập nhật skill: `HPY scripts/setup.py --profile <ten>` rồi restart gateway; `check.py` báo `plugin da cai: Khac ban trong skill` khi quên.
 
 ## Xử lý lỗi
 
 - Kênh không bật (log `No messaging platforms enabled` / thiếu `webchat`): thiếu `aiohttp` hoặc thiếu `allowed_origins`; xem `logs/agent.log` của profile.
 - Bot không có tool tra tài liệu: thiếu gói `mcp` trong Python của Hermes.
-- Open WebUI không thấy chat: sai URL/API key, hoặc admin chưa bật API keys.
+- Hộp thư báo chưa đăng nhập / 401: sai `open_webui.url` (Hermes không gọi được Open WebUI), tài khoản không có vai trò trong `open_webui.roles`, hoặc `open_webui.public_url` khác origin đang mở trang.
 - Lỗi nào cũng báo nguyên văn cho user, không nói "đã xong" khi `check.py` còn `fail`.
