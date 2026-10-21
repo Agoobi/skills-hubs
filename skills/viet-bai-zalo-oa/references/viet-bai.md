@@ -15,7 +15,7 @@ Markdown, script chuyển sang khối của bài Zalo:
 ```
 # Tiêu đề bài
 
-Đoạn mở bài có **chữ đậm**, *nghiêng*, [link](https://...).
+Đoạn mở bài, có thể kèm [link](https://shop.vn/...).
 
 ## Mục nhỏ
 - ý một
@@ -24,8 +24,13 @@ Markdown, script chuyển sang khối của bài Zalo:
 ![Chú thích ảnh](https://shop.vn/wp-content/uploads/anh.jpg)
 ```
 
-- `##` thành dòng chữ đậm (bài Zalo không có tiêu đề cấp 2 riêng).
+Bài tạo qua API, Zalo bỏ mọi thẻ HTML và đổi xuống dòng thành dấu cách (đã kiểm với OA thật), nên script gửi **chữ thô, mỗi đoạn một khối**:
+
+- Mỗi đoạn, mỗi ý danh sách (`• ý một`, `1. bước một`), mỗi trích dẫn là một khối riêng → hiện thành dòng riêng.
+- `##` thành dòng VIẾT HOA (không có tiêu đề hay chữ đậm).
+- `**đậm**`, `*nghiêng*` mất định dạng, chỉ còn chữ; `[chữ](URL)` thành `chữ (URL)`, link không bấm được.
 - Dòng chỉ có ảnh `![chú thích](URL https)` thành khối ảnh riêng; ảnh phải là URL công khai.
+- Cần chữ đậm, link bấm được: chủ OA sửa trên oa.zalo.me trước khi hiện bài.
 
 ## settings.json (mỗi OA)
 
@@ -37,4 +42,4 @@ Markdown, script chuyển sang khối của bài Zalo:
 | `comment` | `show` / `hide`: cho phép bình luận |
 | `brand_voice`, `audience`, `default_cta`, `avoid`, `length` | Giọng văn và quy ước viết |
 
-Biến môi trường: `ZALO_APP_ID`, `ZALO_APP_SECRET` (bắt buộc khi kết nối và làm mới token), `ZALO_TOKEN_FILE` (tùy chọn).
+Biến môi trường: `ZALO_APP_ID`, `ZALO_APP_SECRET` (bắt buộc khi kết nối và làm mới token), `ZALO_TOKEN_FILE` (tùy chọn), `ZALO_ACCESS_TOKEN` + `ZALO_REFRESH_TOKEN` (chỉ cho `connect-import`).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cong cu cho skill viet-bai-zalo-oa. Chi dung thu vien chuan.
 
-Lenh: oas | connect | connect-finish | check | draft | update | list | detail
+Lenh: oas | connect | connect-finish | connect-import | check | draft | update | list | detail
 Bai luon tao o trang thai AN (status=hide): chu OA tu kiem tra va bat hien thi tren oa.zalo.me.
 KHONG co lenh dang/hien bai, khong co lenh xoa. Ket qua in ra JSON de agent doc.
 Token OA luu qua zalo_tokens.py (file ~/.hermes/zalo/tokens.json).
@@ -106,66 +106,56 @@ def hint(code):
 # ---------------------------------------------------------------- noi dung
 
 def _inline(t):
-    t = html.escape(t, quote=False)
-    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{m[2].replace(chr(34), "%22")}">{m[1]}</a>', t)
-    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
-    t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", t)
-    return t
+    """Bai tao qua API: Zalo bo moi the HTML va doi xuong dong thanh dau cach (da kiem voi OA that),
+    nen chi gui chu tron. Entity duoc giai ma, nen escape < > & de chu khong bi nuot nhu the."""
+    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: m[1] if m[1] == m[2] else f"{m[1]} ({m[2]})", t)
+    t = re.sub(r"\*\*(.+?)\*\*", r"\1", t)
+    t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"\1", t)
+    return html.escape(t, quote=False)
 
 
 def md_to_body(md):
-    """Markdown -> body cua bai Zalo: khoi text (HTML don gian) va khoi image (URL cong khai)."""
-    items, buf, para, lst = [], [], [], None
+    """Markdown -> body cua bai Zalo. Moi doan, dong tieu de, y danh sach la 1 khoi text rieng
+    (cach duy nhat de xuong dong); dong chi co anh la 1 khoi image (URL cong khai)."""
+    items, para = [], []
 
-    def flush_text():
-        nonlocal para, lst
+    def text(t):
+        items.append({"type": "text", "content": t})
+
+    def flush():
         if para:
-            buf.append("<p>" + "<br>".join(_inline(x) for x in para) + "</p>")
-            para = []
-        if lst:
-            tag, li = lst
-            buf.append(f"<{tag}>" + "".join(f"<li>{_inline(x)}</li>" for x in li) + f"</{tag}>")
-            lst = None
-
-    def flush_item():
-        flush_text()
-        if buf:
-            items.append({"type": "text", "content": "".join(buf)})
-            buf.clear()
+            text(_inline(" ".join(para)))
+            para.clear()
 
     for line in md.replace("\r\n", "\n").split("\n"):
         st = line.strip()
         if not st:
-            flush_text()
+            flush()
             continue
         img = re.fullmatch(r"!\[([^\]]*)\]\(([^)\s]+)\)", st)
         if img:
             if not img[2].startswith("https://"):
                 die(f"Anh trong bai phai la URL https cong khai (Zalo tu tai ve): {img[2]}")
-            flush_item()
+            flush()
             items.append({"type": "image", "url": img[2], "caption": img[1]})
             continue
         m = re.match(r"^#{1,6}\s+(.*)$", st)
         if m:
-            flush_text()
-            buf.append(f"<p><strong>{_inline(m[1])}</strong></p>")
+            flush()
+            text(_inline(m[1]).upper())
             continue
         m = LIST_ITEM.match(st)
         if m:
-            tag = "ol" if st[0].isdigit() else "ul"
-            if para or (lst and lst[0] != tag):
-                flush_text()
-            lst = lst or (tag, [])
-            lst[1].append(LIST_ITEM.sub("", st))
+            flush()
+            mark = m[1] if st[0].isdigit() else "•"
+            text(f"{mark} {_inline(LIST_ITEM.sub('', st))}")
             continue
         if st.startswith(">"):
-            flush_text()
-            buf.append(f"<blockquote>{_inline(st.lstrip('> '))}</blockquote>")
+            flush()
+            text(f"“{_inline(st.lstrip('> '))}”")
             continue
-        if lst:
-            flush_text()
         para.append(st)
-    flush_item()
+    flush()
     return items
 
 
@@ -267,6 +257,14 @@ def cmd_connect_finish(a):
     out({"ok": True, **res, "next": f"Dien oa_id {res['oa_id']} vao settings.json > oas."})
 
 
+def cmd_connect_import(a):
+    try:
+        res = zt.import_from_env(a.oa_id)
+    except zt.ZaloAuthError as e:
+        die(str(e))
+    out({"ok": True, **res, "next": f"Dien oa_id {res['oa_id']} vao settings.json > oas roi chay check."})
+
+
 def cmd_check(a):
     oa = oa_of(load(), a.oa)
     info = ok_or_die(call(oa, "GET", "/oa/getoa"), "lay thong tin OA")
@@ -331,6 +329,9 @@ def main():
     p.add_argument("callback")
     p.add_argument("--name")
     p.set_defaults(f=cmd_connect_finish)
+    p = sp.add_parser("connect-import", help="Nap token co san tu env ZALO_ACCESS_TOKEN, ZALO_REFRESH_TOKEN")
+    p.add_argument("--oa-id", help="Bo trong thi doc tu access token")
+    p.set_defaults(f=cmd_connect_import)
 
     def oa_arg(p):
         p.add_argument("--oa", help="alias OA (mac dinh default_oa)")

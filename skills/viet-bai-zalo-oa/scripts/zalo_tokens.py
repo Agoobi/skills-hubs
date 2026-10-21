@@ -7,16 +7,24 @@ va khoa file (fcntl) khi lam moi.
 Dong lenh (ket noi OA, xem token):
     python3 -I zalo_tokens.py auth-url --redirect https://shop.vn/
     python3 -I zalo_tokens.py auth-code "<URL callback day du sau khi chu OA bam Dong y>"
+    ZALO_ACCESS_TOKEN=.. ZALO_REFRESH_TOKEN=.. python3 -I zalo_tokens.py import  # token co san (API Explorer)
     python3 -I zalo_tokens.py list | refresh --oa <oa_id>
 
 Cau truc file:
 {"app_id": "...", "oas": {"<oa_id>": {"name": "...", "access_token": "...", "refresh_token": "...",
                                        "expires_at": 1730000000}}}
 """
-import base64, fcntl, hashlib, json, os, secrets, sys, time, urllib.parse, urllib.request, urllib.error
+import base64, hashlib, json, os, secrets, sys, time, urllib.parse, urllib.request, urllib.error
 from pathlib import Path
 
+try:
+    import fcntl
+except ImportError:  # Windows: khoa bang msvcrt
+    fcntl = None
+    import msvcrt
+
 OAUTH = os.getenv("ZALO_OAUTH_BASE") or "https://oauth.zaloapp.com/v4/oa"  # env de test voi API gia lap
+API = os.getenv("ZALO_ARTICLE_API") or "https://openapi.zalo.me/v2.0"
 REFRESH_MARGIN = 300  # lam moi truoc khi het han 5 phut
 
 
@@ -51,7 +59,10 @@ class _Locked:
         f = token_file()
         f.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.lock = open(f.with_suffix(".lock"), "w")
-        fcntl.flock(self.lock, fcntl.LOCK_EX)
+        if fcntl:
+            fcntl.flock(self.lock, fcntl.LOCK_EX)
+        else:
+            msvcrt.locking(self.lock.fileno(), msvcrt.LK_LOCK, 1)
         self.data = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"oas": {}}
         self.data.setdefault("oas", {})
         return self
@@ -61,7 +72,10 @@ class _Locked:
         _write_private(f, json.dumps(self.data, ensure_ascii=False, indent=2))
 
     def __exit__(self, *exc):
-        fcntl.flock(self.lock, fcntl.LOCK_UN)
+        if fcntl:
+            fcntl.flock(self.lock, fcntl.LOCK_UN)
+        else:
+            msvcrt.locking(self.lock.fileno(), msvcrt.LK_UNLCK, 1)
         self.lock.close()
 
 
@@ -103,6 +117,34 @@ def exchange_code(oa_id, code, code_verifier, name=None, app_id=None, secret=Non
     return {"oa_id": str(oa_id), "expires_at": entry["expires_at"]}
 
 
+def import_tokens(access, refresh, oa_id=None, expires_in=3600, app_id=None):
+    """Nap cap token co san (vd lay tu API Explorer tren developers.zalo.me) thay cho OAuth.
+    Khong biet oa_id thi hoi Zalo bang chinh access token."""
+    name = None
+    if not oa_id:
+        req = urllib.request.Request(API + "/oa/getoa", headers={"access_token": access})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                res = json.loads(r.read())
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            raise ZaloAuthError(f"Khong goi duoc getoa: {e}")
+        if res.get("error", 0) != 0:
+            raise ZaloAuthError(f"Access token khong dung duoc ({res.get('error')} {res.get('message')}): "
+                                "truyen --oa-id de nap bang refresh token.")
+        oa_id, name = res["data"]["oa_id"], res["data"].get("name")
+    with _Locked() as s:
+        if app_id or os.getenv("ZALO_APP_ID"):
+            s.data["app_id"] = app_id or os.getenv("ZALO_APP_ID")
+        entry = s.data["oas"].setdefault(str(oa_id), {})
+        if name:
+            entry["name"] = name
+        _store(entry, {"access_token": access, "refresh_token": refresh, "expires_in": expires_in})
+        if not access:
+            entry["expires_at"] = 0
+        s.save()
+    return {"oa_id": str(oa_id), "name": name, "expires_at": entry["expires_at"]}
+
+
 def access_token(oa_id, stale=None, app_id=None, secret=None, force=False):
     """Tra access token con han; tu lam moi (co khoa) neu sap het han.
     stale = token vua bi Zalo tu choi: lam moi ngay, tru khi tien trinh khac da lam moi roi."""
@@ -123,6 +165,17 @@ def access_token(oa_id, stale=None, app_id=None, secret=None, force=False):
         _store(entry, data)
         s.save()
         return entry["access_token"]
+
+
+def import_from_env(oa_id=None):
+    """Token doc tu env (khong qua tham so dong lenh, de khong lo trong lich su shell / ps)."""
+    access, refresh = os.getenv("ZALO_ACCESS_TOKEN"), os.getenv("ZALO_REFRESH_TOKEN")
+    if not refresh:
+        raise ZaloAuthError("Thieu env ZALO_REFRESH_TOKEN (va ZALO_ACCESS_TOKEN neu co).")
+    if not access and not oa_id:
+        raise ZaloAuthError("Khong co ZALO_ACCESS_TOKEN thi phai truyen --oa-id.")
+    # khong co access token: de het han ngay, lan goi dau se tu lam moi bang refresh token
+    return import_tokens(access or "", refresh, oa_id)
 
 
 def list_oas():
@@ -181,6 +234,8 @@ def _cli():
     c = sub.add_parser("auth-code", help="Dan URL callback (co code, oa_id, state) de luu token")
     c.add_argument("callback")
     c.add_argument("--name", help="Ten goi nho cua OA")
+    i = sub.add_parser("import", help="Nap token co san tu env ZALO_ACCESS_TOKEN, ZALO_REFRESH_TOKEN")
+    i.add_argument("--oa-id", help="Bo trong thi doc tu access token")
     sub.add_parser("list", help="Cac OA da ket noi")
     r = sub.add_parser("refresh", help="Lam moi token ngay (kiem tra ket noi)")
     r.add_argument("--oa", required=True)
@@ -191,6 +246,8 @@ def _cli():
             res["next"] = "Gui link cho chu OA (dang nhap Zalo quan tri OA) bam Dong y, roi dan URL callback vao auth-code."
         elif args.cmd == "auth-code":
             res = complete(args.callback, args.name)
+        elif args.cmd == "import":
+            res = import_from_env(args.oa_id)
         elif args.cmd == "list":
             res = {"token_file": str(token_file()), "oas": list_oas()}
         else:

@@ -27,12 +27,13 @@ Viết bài (article) cho **Zalo Official Account** theo các "cổng" (gate) đ
 Mọi lệnh chạy bằng `python -I scripts/zalooa.py <lệnh>` từ thư mục skill (chỉ cần Python 3). Cần env `ZALO_APP_ID`, `ZALO_APP_SECRET` (app trên developers.zalo.me mà admin quản lý).
 
 1. App Zalo: mục **Official Account** khai báo callback URL là một trang bất kỳ của mình (vd trang chủ website `https://shop.vn/`) và bật quyền **quản lý bài viết**.
-2. `connect --redirect <callback URL>` → gửi link cho **chủ OA** (tài khoản Zalo có quyền admin OA) bấm Đồng ý.
-3. Zalo chuyển chủ OA về callback URL kèm `?code=...&oa_id=...`. Chủ OA copy nguyên URL trên thanh địa chỉ gửi lại → `connect-finish "<URL>"`. Link hết hạn sau 30 phút.
-4. Copy `settings.example.json` thành `settings.json`, điền `oa_id` (xem bằng `oas`), giọng văn, tác giả. Xem `references/viet-bai.md`.
-5. `check --oa <alias>`: kiểm tra token, tên OA, quyền đọc bài viết.
+2. Kết nối OA, chọn một trong hai cách:
+   - **Có sẵn token** (admin lấy ở developers.zalo.me → Công cụ → API Explorer, loại *OA access token*): đặt env `ZALO_ACCESS_TOKEN`, `ZALO_REFRESH_TOKEN` rồi chạy `connect-import`. Script tự đọc `oa_id` và tên OA. Không dán token vào tham số dòng lệnh.
+   - **OAuth**: `connect --redirect <callback URL>` → gửi link cho **chủ OA** (tài khoản Zalo có quyền admin OA) bấm Đồng ý. Zalo chuyển về callback URL kèm `?code=...&oa_id=...`; chủ OA copy nguyên URL trên thanh địa chỉ gửi lại → `connect-finish "<URL>"`. Link hết hạn sau 30 phút.
+3. Copy `settings.example.json` thành `settings.json`, điền `oa_id` (bước 2 in ra), giọng văn, tác giả. Xem `references/viet-bai.md`.
+4. `check --oa <alias>`: kiểm tra token, tên OA, quyền đọc bài viết.
 
-Token lưu ở `~/.hermes/zalo/tokens.json` (quyền 600, tự làm mới, có khóa file). Refresh token hết hạn sau khoảng 3 tháng không dùng; khi đó chạy lại bước 2.
+`settings.json` **không** chứa token. Token lưu ở `~/.hermes/zalo/tokens.json` (`$ZALO_TOKEN_FILE`, quyền 600, có khóa file), tự làm mới trước khi hết hạn. Access token sống khoảng 24 giờ; refresh token **chỉ dùng được 1 lần** (mỗi lần làm mới Zalo trả cặp mới, cặp cũ chết), nên không dùng cùng refresh token ở nơi khác sau khi đã nạp vào skill. Refresh token hết hạn sau khoảng 3 tháng không dùng; khi đó kết nối lại (bước 2).
 
 ## Quy trình (các Gate)
 
@@ -42,9 +43,9 @@ Bắt đầu: `oas`. OA nào `ket_noi: CHUA` → làm phần Cài đặt rồi d
 
 **Gate 2 — Nội dung.** Hỏi gọn trong 1 lượt: chủ đề, mục tiêu (ưu đãi, tin tức, hướng dẫn, chăm sóc khách), thông tin thật (sản phẩm, giá, ưu đãi, thời hạn, điều kiện), CTA, độ dài. Thiếu thì hỏi lại.
 
-**Gate 3 — Ảnh bìa.** Bắt buộc 1 ảnh bìa là **URL https công khai** (Zalo tự tải ảnh về; không nhận file trên máy). User đưa URL, hoặc đưa file rồi upload lên website bằng skill `viet-bai-website-wordpress` (`upload`) để lấy `url`. Ảnh trong bài cũng phải là URL https. Không dùng ảnh không rõ bản quyền.
+**Gate 3 — Ảnh bìa.** Bắt buộc 1 ảnh bìa là **URL https công khai** trả thẳng file ảnh (Zalo tải về rồi lưu sang `zadn.vn`; không nhận file trên máy). Một số host bị từ chối (`-201 photo_url is invalid`, đã gặp với Wikimedia và Picsum); ảnh trên website của shop hoặc Unsplash thì nhận. User đưa URL, hoặc đưa file rồi upload lên website bằng skill `viet-bai-website-wordpress` (`upload`) để lấy `url`. Ảnh trong bài cũng phải là URL https. Không dùng ảnh không rõ bản quyền.
 
-**Gate 4 — Bản nháp.** Viết theo `references/viet-bai.md` và cấu hình OA, lưu `drafts/<ten>.md` (dòng đầu `# Tiêu đề`, tối đa 150 ký tự). Kèm mô tả ngắn (≤ 300 ký tự, hiện ở danh sách bài và khi chia sẻ). Hiển thị nguyên văn, lặp đến khi user nói "ok".
+**Gate 4 — Bản nháp.** Viết theo `references/viet-bai.md` và cấu hình OA, lưu `drafts/<ten>.md` (dòng đầu `# Tiêu đề`, tối đa 150 ký tự). Bài tạo qua API **chỉ có chữ thô**: không đậm, nghiêng, link bấm được; nhấn mạnh bằng cách tách đoạn, emoji, tiêu đề mục. Kèm mô tả ngắn (≤ 300 ký tự, hiện ở danh sách bài và khi chia sẻ). Hiển thị nguyên văn, lặp đến khi user nói "ok".
 
 **Gate 5 — Duyệt cuối.** Tóm tắt: OA, tiêu đề, mô tả, tác giả, ảnh bìa, bật/tắt bình luận, trạng thái **ẨN**. Hỏi: "Tạo bài (ẩn) trên Zalo OA nhé?" Chỉ chạy khi user đồng ý.
 
@@ -55,7 +56,7 @@ python -I scripts/zalooa.py draft --oa <alias> --content-file drafts/<ten>.md --
   --description "<mô tả ngắn>" [--author "<tác giả>"] [--comment show|hide]
 ```
 
-Script tạo bài (`article/create`), chờ Zalo xử lý xong (`article/verify`) rồi trả `id`. Gửi user: tiêu đề, `id`, trạng thái ẩn, trang quản lý `https://oa.zalo.me` → Bài viết. Nhắc: "Bạn mở trang quản lý bài viết của OA, xem trước, rồi bật Hiển thị hoặc gửi bài cho người quan tâm."
+Script tạo bài (`article/create`), chờ Zalo xử lý xong (`POST article/verify`) rồi trả `id`. Bài nằm trong `list` với `status: hide`. Gửi user: tiêu đề, `id`, trạng thái ẩn, trang quản lý `https://oa.zalo.me` → Bài viết. Nhắc: "Bạn mở trang quản lý bài viết của OA, xem trước, rồi bật Hiển thị hoặc gửi bài cho người quan tâm."
 
 ## Sửa bài đã tạo
 
@@ -71,6 +72,6 @@ Xem lại: `list`, `detail <id>`.
 
 - `-216` / `-124`: token sai, hết hạn → script tự làm mới 1 lần; vẫn lỗi thì chạy lại `connect`.
 - `-230`: OA chưa cấp quyền cho app → `connect` lại, nhắc chủ OA bật quyền bài viết.
-- `-201`: tham số sai (tiêu đề / mô tả quá dài, ảnh bìa không tải được, link ảnh không phải https).
+- `-201`: tham số sai (tiêu đề / mô tả quá dài, ảnh bìa không tải được hoặc host bị Zalo từ chối → thử URL ảnh khác).
 - Tạo xong mà chưa có `id` (Zalo xử lý chậm): chờ vài phút rồi `list`, không tạo lại để tránh trùng bài.
 - Lỗi khác: báo nguyên văn, không nói đã tạo bài khi chưa có `id`.
