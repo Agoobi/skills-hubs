@@ -15,7 +15,7 @@ Module nay cung duoc plugin chatbot_guard import (setup.py chep vao plugin).
 """
 import argparse, csv, hashlib, hmac, io, json, logging, math, os, re, shutil, subprocess, sys, time, unicodedata
 import urllib.request, urllib.error, zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -75,6 +75,19 @@ W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 S = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 
 
+def _docx_text(el):
+    """Chu trong 1 doan/o: <w:br/> thanh xuong dong, <w:tab/> thanh dau cach (khong de chu dinh nhau)."""
+    out = []
+    for n in el.iter():
+        if n.tag == W + "t":
+            out.append(n.text or "")
+        elif n.tag in (W + "br", W + "cr"):
+            out.append("\n")
+        elif n.tag == W + "tab":
+            out.append(" ")
+    return re.sub(r"[ \t]*\n[ \t]*", "\n", "".join(out)).strip()
+
+
 def read_docx(path):
     with zipfile.ZipFile(path) as z:
         root = ET.fromstring(z.read("word/document.xml"))
@@ -82,22 +95,71 @@ def read_docx(path):
     body = root.find(W + "body")
     for el in body:
         if el.tag == W + "p":
-            text = "".join(t.text or "" for t in el.iter(W + "t")).strip()
+            text = _docx_text(el)
             style = el.find(f"{W}pPr/{W}pStyle")
             level = 0
             if style is not None:
                 m = re.search(r"(\d)$", style.get(W + "val", ""))
                 if "heading" in style.get(W + "val", "").lower() and m:
                     level = int(m.group(1))
-            if text:
-                lines.append(("#" * min(level, 4) + " " if level else "") + text)
+            if text and level:
+                lines.append("#" * min(level, 4) + " " + text.replace("\n", " "))
+            elif text and el.find(f"{W}pPr/{W}numPr") is not None:  # dong danh sach
+                lines.append("- " + text.replace("\n", " "))
+            elif text:
+                lines.append(text.replace("\n", "  \n"))
         elif el.tag == W + "tbl":
-            rows = [["".join(t.text or "" for t in c.iter(W + "t")).strip() for c in row.iter(W + "tc")]
-                    for row in el.iter(W + "tr")]
+            rows = [[_docx_text(c).replace("\n", " ") for c in row.iter(W + "tc")] for row in el.iter(W + "tr")]
             rows = [r for r in rows if any(r)]
             if rows:
                 lines.append(rows_to_md(rows))
     return "\n\n".join(lines)
+
+
+R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+PR = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+DATE_FMTS = set(range(14, 23)) | {45, 46, 47}  # ma dinh dang ngay co san cua Excel
+PCT_FMTS = {9, 10}
+
+
+def _xlsx_formats(z):
+    """style index (thuoc tinh s cua o) -> 'pct' / 'date' / None, doc tu xl/styles.xml."""
+    if "xl/styles.xml" not in z.namelist():
+        return []
+    st = ET.fromstring(z.read("xl/styles.xml"))
+    custom = {int(f.get("numFmtId")): f.get("formatCode", "") for f in st.iter(S + "numFmt")}
+    kinds = []
+    xfs = st.find(S + "cellXfs")
+    for xf in (xfs if xfs is not None else []):
+        fid = int(xf.get("numFmtId", 0))
+        code = re.sub(r'"[^"]*"|\[[^\]]*\]|\\.', "", custom.get(fid, ""))  # bo chu trong ngoac kep, [mau], \x
+        if fid in PCT_FMTS or "%" in code:
+            kinds.append("pct")
+        elif fid in DATE_FMTS or (fid in custom and re.search(r"[dy]|m{3,}", code, re.I)):
+            kinds.append("date")
+        else:
+            kinds.append(None)
+    return kinds
+
+
+def _xlsx_value(raw, kind):
+    """So luu trong Excel -> chu nhu Excel hien: 0.1 + dinh dang % -> '10%', 46387 + dinh dang ngay -> '31/12/2026'."""
+    try:
+        v = float(raw)
+    except ValueError:
+        return raw
+    if kind == "pct":
+        return _plain(v * 100) + "%"
+    if kind == "date" and 0 < v < 2958466:
+        d = datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=v)
+        return d.strftime("%d/%m/%Y %H:%M" if v % 1 else "%d/%m/%Y")
+    return _plain(v) if abs(v) < 1e15 else raw
+
+
+def _plain(v):
+    """1500000.0 -> '1500000', 0.15000000000000002 -> '0.15' (khong dung dang 1.5e+06)."""
+    v = round(v, 6)
+    return str(int(v)) if v == int(v) else f"{v:.6f}".rstrip("0")
 
 
 def read_xlsx(path):
@@ -106,40 +168,55 @@ def read_xlsx(path):
         if "xl/sharedStrings.xml" in z.namelist():
             for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(S + "si"):
                 shared.append("".join(t.text or "" for t in si.iter(S + "t")))
+        fmts = _xlsx_formats(z)
+        # thu tu va ten sheet theo workbook.xml; file sheetN.xml tim qua rels (sheet doi cho thi so N khong doi)
         wb = ET.fromstring(z.read("xl/workbook.xml"))
-        names = [s.get("name") for s in wb.iter(S + "sheet")]
-        sheets = sorted(n for n in z.namelist() if re.match(r"xl/worksheets/sheet\d+\.xml$", n))
+        rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")).iter(PR + "Relationship")}
         parts = []
-        for i, sheet in enumerate(sorted(sheets, key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[1]).group(1)))):
+        for s in wb.iter(S + "sheet"):
+            target = rels.get(s.get(R + "id"), "")
+            target = target.lstrip("/") if target.startswith("/") else "xl/" + target
+            if target not in z.namelist():
+                continue
             rows = []
-            for row in ET.fromstring(z.read(sheet)).iter(S + "row"):
+            for row in ET.fromstring(z.read(target)).iter(S + "row"):
                 vals = []
                 for c in row.iter(S + "c"):
+                    col = re.match(r"[A-Z]+", c.get("r", ""))
+                    if col:  # o trong bi bo qua trong XML: chen lai cho dung cot
+                        idx = sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col.group(0)))) - 1
+                        vals += [""] * (idx - len(vals))
                     v = c.find(S + "v")
                     if c.get("t") == "s" and v is not None:
                         vals.append(shared[int(v.text)])
                     elif c.get("t") == "inlineStr":
                         vals.append("".join(t.text or "" for t in c.iter(S + "t")))
+                    elif v is not None and v.text and c.get("t") in (None, "n"):
+                        s_idx = int(c.get("s", 0))
+                        vals.append(_xlsx_value(v.text, fmts[s_idx] if s_idx < len(fmts) else None))
                     else:
                         vals.append(v.text if v is not None and v.text else "")
                 if any(x.strip() for x in vals):
                     rows.append(vals)
             if rows:
-                title = names[i] if i < len(names) else f"Sheet {i + 1}"
-                parts.append(f"## {title}\n\n" + rows_to_md(rows))
+                parts.append(f"## {s.get('name')}\n\n" + rows_to_md(rows))
     return "\n\n".join(parts)
 
 
 def rows_to_md(rows):
-    """Moi dong thanh 1 cau 'Cot: gia tri' de tim kiem va trich dan chinh xac."""
-    head = [h.strip() for h in rows[0]]
-    lines = []
-    for r in rows[1:]:
+    """Moi dong thanh 1 cau 'Cot: gia tri' de tim kiem va trich dan chinh xac.
+    Dong tieu de (vd 'BANG GIA 2026' gop o phia tren bang) giu nguyen; dong dau tien du day moi la ten cot."""
+    filled = [sum(1 for v in r if v.strip()) for r in rows]
+    width = max(filled)
+    h = next((i for i, n in enumerate(filled) if n >= max(2, (width + 1) // 2)), 0) if width > 1 else 0
+    lines = [" ".join(v.strip() for v in r if v.strip()) for r in rows[:h]]
+    head = [x.strip() for x in rows[h]]
+    for r in rows[h + 1:]:
         pairs = [f"{head[j] if j < len(head) and head[j] else 'Cot ' + str(j + 1)}: {v.strip()}"
                  for j, v in enumerate(r) if v.strip()]
         if pairs:
             lines.append("- " + "; ".join(pairs))
-    return "\n".join(lines) if lines else "\n".join("- " + " | ".join(r) for r in rows)
+    return "\n".join(lines) if len(rows) > h + 1 else "\n".join("- " + " | ".join(r) for r in rows)
 
 
 def read_csv(path):
@@ -161,7 +238,8 @@ def read_pdf(path):
 
 # ---------------------------------------------------------------- so lieu (dung chung: chatbot_guard + verify)
 
-MONEY = re.compile(r"(\d[\d.,]*)\s*(tỷ|tỉ|triệu|tr|nghìn|ngàn|k|đồng|đ|vnđ|vnd|₫)(?![a-zà-ỹ])", re.I)
+MONEY = re.compile(r"(\d[\d.,]*)\s*(tỷ|tỉ|triệu|tr|nghìn|ngàn|k|đồng|đ|vnđ|vnd|₫)(?:\s*(\d)(?![\d.,%]))?(?![a-zà-ỹ])", re.I)
+DURATION = re.compile(r"(\d+(?:[.,]\d+)?)\s*(ngày|tháng|năm|tuần|giờ|tiếng|phút|h)(?![a-zà-ỹ])", re.I)
 PERCENT = re.compile(r"(\d+(?:[.,]\d+)?)\s*(%|phần trăm)", re.I)
 PHONE = re.compile(r"(?<!\d)(?:\+?84|0)(?:[\s.\-]?\d){8,10}(?!\d)")
 GROUPED = re.compile(r"(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d.,]*\d)")  # 99.000 / 1.200.000: gia khong don vi
@@ -191,7 +269,10 @@ def _money(text: str):
     for m in MONEY.finditer(text):
         v = _num(m.group(1))
         if v is not None:
-            res.append((m.group(0), _key(v * UNITS.get(m.group(2).lower(), 1))))
+            unit = UNITS.get(m.group(2).lower(), 1)
+            if m.group(3) and unit >= 1e3:  # "1tr5" = 1,5 trieu, "2 triệu 5" = 2,5 trieu
+                v += int(m.group(3)) / 10
+            res.append((m.group(0), _key(v * unit)))
             spans.append(m.span())
     for m in GROUPED.finditer(text):
         if not any(a <= m.start() < b for a, b in spans):
@@ -210,6 +291,7 @@ def unsupported_numbers(response: str, evidence: str, user_text: str = ""):
     - %: chi so voi % trong tai lieu ("30 ngay" khong lam can cu cho "30%")
     - SDT: co trong tai lieu / lien he / cau khach vua gui (bot nhac lai SDT khach)
     - so dai >= 6 chu so (tai khoan, ma): phai co nguyen chuoi so trong tai lieu
+    - thoi han (24 thang, 3 ngay): con so phai co trong tai lieu hoac cau khach vua gui (chi so so, khong so don vi)
     Gia/% khach tu noi ("giam 50% dung khong?") KHONG tinh la can cu."""
     bad = []
     ev_money = {v for _, v in _money(evidence)[0]}
@@ -221,6 +303,15 @@ def unsupported_numbers(response: str, evidence: str, user_text: str = ""):
     for m in PERCENT.finditer(response):
         spans.append(m.span())
         if _key(_num(m.group(1))) not in ev_pct:
+            bad.append(m.group(0))
+
+    # thoi han (bao hanh 24 thang, giao 3 ngay): so phai co trong tai lieu hoac cau khach vua hoi
+    ev_nums = {_key(v) for v in (_num(m.group(0)) for m in NUMBER.finditer(evidence + "\n" + user_text)) if v is not None}
+    for m in DURATION.finditer(response):
+        if any(a <= m.start() < b for a, b in spans):
+            continue
+        spans.append(m.span())
+        if _key(_num(m.group(1))) not in ev_nums:
             bad.append(m.group(0))
 
     ok_phones = _phones(evidence) | _phones(user_text)

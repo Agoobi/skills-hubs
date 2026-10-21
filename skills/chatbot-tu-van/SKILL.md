@@ -19,7 +19,7 @@ Skill này dành cho **admin cài đặt và bảo trì**. Lúc chatbot chạy, 
 | Thành phần (cài vào `$HERMES_HOME/plugins/`) | Việc làm |
 |---|---|
 | `webchat` (kênh) | Phục vụ `widget.js`, nhận tin khách qua `/api/chat`, trả lời qua long-poll. Chặn domain lạ (CORS), giới hạn tốc độ. |
-| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản không có trong tài liệu (thay bằng câu xin thông tin liên hệ và ghi sự kiện); không có thông tin thì nói chưa có và xin khách các thông tin trong `thu_thap_khach`; báo khách cần tư vấn vào folder lead của Open WebUI; bỏ dấu `/` để khách không gọi lệnh Hermes. |
+| `chatbot_guard` (hook) | Mỗi lượt: chèn vai trò + quy tắc + đoạn tài liệu tìm được; chặn câu trả lời có giá, %, SĐT, số tài khoản, thời hạn (ngày/tháng/năm…) không có trong tài liệu (thay bằng câu xin thông tin liên hệ và ghi sự kiện); không có thông tin thì nói chưa có và xin khách các thông tin trong `thu_thap_khach`; báo khách cần tư vấn vào folder lead của Open WebUI; bỏ dấu `/` để khách không gọi lệnh Hermes. |
 | MCP `kb` (`chatbot/kb.py`) | 4 tool duy nhất của kênh chat: `tim_kien_thuc`, `doc_tai_lieu`, `luu_khach_hang`, `chuyen_nhan_vien`. Kênh chat **không có** terminal, file, web. Chỉ tìm trong file kiến thức **đã `verify`** và chưa bị sửa sau đó. |
 
 ## Quy tắc sắt

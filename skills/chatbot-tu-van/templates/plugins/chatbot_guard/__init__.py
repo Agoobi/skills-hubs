@@ -4,7 +4,7 @@ Khong phu thuoc agent co nghe theo skill hay khong:
 1. pre_gateway_dispatch: khach go "/lenh" thi bo dau "/" (khach khong duoc dung lenh quan tri cua Hermes).
 2. pre_llm_call: LUON tra kho tai lieu theo cau hoi va dua cac doan tim duoc vao ngu canh luot do.
 3. post_tool_call: gom them ket qua tool tim/doc tai lieu ma agent tu goi trong luot.
-4. transform_llm_output: cau tra loi co so tien, %, so dien thoai, so dai (tai khoan, ma) khong co trong
+4. transform_llm_output: cau tra loi co so tien, %, so dien thoai, so dai (tai khoan, ma), thoi han khong co trong
    tai lieu vua tra / thong tin lien he cau hinh san (SDT thi tinh ca SDT khach vua gui) -> thay bang cau mau va
    ghi su kien "guard_blocked" de nhan vien xu ly.
 

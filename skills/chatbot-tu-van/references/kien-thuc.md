@@ -9,6 +9,7 @@ file user gửi ──ingest──► nguon/<ten>.md ──agent soạn──►
 ```
 
 - `nguon/` là bản gốc chuyển sang Markdown, không sửa tay. Muốn đổi thì user gửi file mới rồi `ingest` lại.
+- Excel: ô %, ô ngày được đọc như Excel hiển thị (`10%`, `31/12/2026`); dòng tiêu đề phía trên bảng giữ thành dòng chữ, dòng đầy đủ đầu tiên là tên cột. Giá lưu dạng số trong Excel ra số trần (`1500000`), soạn thành `1.500.000đ` hay `1,5 triệu` đều qua `verify`. Vẫn đọc lại `nguon/` sau khi ingest: ô gộp, bảng nhiều tầng tiêu đề có thể lệch cột.
 - Một file kiến thức có thể lấy từ nhiều nguồn; một nguồn có thể chia ra nhiều file kiến thức.
 
 ## Cách soạn một file kiến thức
