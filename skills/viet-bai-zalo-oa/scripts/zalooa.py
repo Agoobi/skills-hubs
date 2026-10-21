@@ -225,6 +225,14 @@ def verify(oa, token):
         token=token)
 
 
+def assert_hidden(oa, art_id):
+    """Doc lai bai sau khi tao/sua: chi bao thanh cong khi Zalo xac nhan bai dang AN."""
+    status = ok_or_die(call(oa, "GET", "/article/getdetail", params={"id": art_id}), "doc lai bai").get("status")
+    if status != "hide":
+        die(f"CANH BAO: bai {art_id} dang co status={status!r}, khong phai AN. Bao chu OA kiem tra ngay "
+            "tren oa.zalo.me.", id=art_id, status=status)
+
+
 def manage_url(oa):
     return "https://oa.zalo.me/manage/article"  # trang quan ly bai viet (dang nhap quyen admin OA)
 
@@ -283,6 +291,7 @@ def cmd_draft(a):
         die(f"Zalo khong tra token: {data}")
     art_id = verify(oa, token)
     save_state(oa, art_id, art)
+    assert_hidden(oa, art_id)
     out({"ok": True, "oa": oa["alias"], "id": art_id, "status": "hide", "title": art["title"],
          "manage_url": manage_url(oa),
          "next": "Bai dang AN. Chu OA vao trang quan ly bai viet, kiem tra roi bat Hien thi / gui broadcast."})
@@ -294,13 +303,15 @@ def cmd_update(a):
     if not f.exists():
         die(f"Khong co ban luu cua bai {a.id} (chi sua duoc bai tao bang skill nay). Sua tren oa.zalo.me.")
     detail = ok_or_die(call(oa, "GET", "/article/getdetail", params={"id": a.id}), "doc bai")
-    if detail.get("status") == "show":
-        die(f"Bai {a.id} dang HIEN THI: khong sua bang skill. Chu OA an bai truoc hoac sua tren oa.zalo.me.")
+    if detail.get("status") != "hide":
+        die(f"Bai {a.id} khong o trang thai AN (status={detail.get('status')!r}): khong sua bang skill. "
+            "Chu OA an bai truoc hoac sua tren oa.zalo.me.")
     art = build(oa, a, json.loads(f.read_text(encoding="utf-8")))
     data = ok_or_die(call(oa, "POST", "/article/update", body={**art, "id": a.id}), "sua bai")
     if data.get("token"):
         verify(oa, data["token"])
     save_state(oa, a.id, art)
+    assert_hidden(oa, a.id)
     out({"ok": True, "oa": oa["alias"], "id": a.id, "status": "hide", "title": art["title"], "manage_url": manage_url(oa)})
 
 
