@@ -18,7 +18,7 @@ import re
 import threading
 import time
 
-from . import kb, owui_mirror
+from . import kb, owui_inbox
 
 logger = logging.getLogger(__name__)
 
@@ -147,36 +147,14 @@ def on_tool(tool_name=None, args=None, result=None, session_id=None, **_):
     return None
 
 
-_lead_mirrors: dict = {}
-LEAD_TITLES = {"lead": "Khách để lại thông tin", "handoff": "Khách cần gặp nhân viên",
-               "guard_blocked": "Bot không trả lời được, cần nhân viên"}
-
-
 def _notify(kind, sender, data):
-    """Bao lead vao folder Open WebUI (open_webui.lead_folder): moi khach 1 chat, moi su kien 1 tin, kem link hoi thoai."""
+    """Bao su kien vao chat cua chinh khach do trong hop thu Open WebUI: the su kien, chuyen sang nhom "Can xu ly"."""
     try:
-        ow = _settings().get("open_webui") or {}
-        if not (ow.get("lead_folder") and ow.get("url") and ow.get("api_key")) or not sender:
-            return
-        key = (ow["url"], ow["api_key"], ow["lead_folder"])
-        with _lock:
-            m = _lead_mirrors.get(key) or owui_mirror.Mirror(kb.home(), {**ow, "folder": ow["lead_folder"]})
-            _lead_mirrors[key] = m
         sender = str(sender or "")
+        if not sender:
+            return
         conv = "web:" + sender.removeprefix("web-") if sender.startswith("web-") else sender
-        chat = m._map(conv) or {}
-        lines = [f"🔔 **{LEAD_TITLES.get(kind, kind)}**", f"Kênh: website · khách {conv.split(':')[-1][:6]}"]
-        for f, label in list(kb.FIELDS.items()) + [("nhu_cau", "nhu cầu"), ("ly_do", "lý do"), ("tom_tat", "tóm tắt"),
-                                                   ("lien_he", "liên hệ"), ("khach_hoi", "khách hỏi"),
-                                                   ("so_lieu_khong_co_can_cu", "số liệu bot định nói nhưng không có trong tài liệu")]:
-            if data.get(f):
-                lines.append(f"{label[0].upper() + label[1:]}: {data[f]}")
-        if chat.get("chat_id"):
-            lines.append(f"Xem hội thoại: {m.url}/c/{chat['chat_id']}")
-        who = data.get("ten") or data.get("sdt") or data.get("email")
-        # chi doi ten chat khi biet ten/SDT/email; su kien khong co thong tin thi giu ten cu
-        title = f"Lead · {who}" if who else (None if m._map("lead:" + conv) else f"Lead · khách {conv.split(':')[-1][:6]}")
-        m.add("lead:" + conv, title, "assistant", "\n".join(lines))
+        owui_inbox.get_inbox(kb.home(), _settings()).event(conv, kind, data)
     except Exception as e:  # bao lead loi khong duoc anh huong cuoc tro chuyen
         logger.warning("[chatbot_guard] khong bao duoc lead vao Open WebUI: %s", e)
 

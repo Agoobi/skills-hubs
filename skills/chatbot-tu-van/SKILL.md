@@ -45,7 +45,7 @@ HPY scripts/setup.py --profile <ten>
 
 Script chép plugin, ghi `config.yaml` (bật plugin, MCP `kb`, giới hạn toolset kênh chat, tắt onboarding), ghi `.env` (quyền 600) và tạo `chatbot/settings.json` từ mẫu. Chạy lại an toàn (giữ `settings.json`, sao lưu `config.yaml.bak-chatbot`). Có `warnings` về thiếu `aiohttp` / `mcp` thì cài theo lệnh in ra.
 
-**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `open_webui` (kèm `folder`, `lead_folder` nếu user muốn; dán link folder thì lấy id ở cuối), `thu_thap_khach`, `lead_webhook` nếu có. `fallback_text` để trống thì tự ghép theo `thu_thap_khach`. Cho user xem lại (che key) trước khi lưu.
+**Gate 3 — Điền `chatbot/settings.json`** (xem `references/trien-khai.md`): `business`, `webchat.allowed_origins` (đủ `https://shop.vn` và `https://www.shop.vn`), `webchat.public_url` (URL https của bot, cho nút trên thẻ khách), `open_webui` (URL, API key), `thu_thap_khach`, `lead_webhook` nếu có. `fallback_text` để trống thì tự ghép theo `thu_thap_khach`. Cho user xem lại (che key) trước khi lưu.
 
 **Gate 4 — Soạn kiến thức** (chi tiết: `references/kien-thuc.md`). Gọi `KB="python3 -I scripts/kb.py --home <HERMES_HOME>/chatbot"`.
 
@@ -78,7 +78,7 @@ python3 scripts/eval.py --profile <ten> [--cases <file-cau-hoi-rieng.json>]
 <script src="https://bot.shop.vn/widget.js" defer></script>
 ```
 
-Kèm: hội thoại xem ở Open WebUI (tài khoản sở hữu API key, mỗi khách 1 chat tên `Web · khách …`); chỉ xem, trả lời trong Open WebUI **không** tới khách. Khách để lại thông tin / cần người thật / câu bị chặn hiện trong folder `lead_folder` của Open WebUI (mỗi khách 1 chat `Lead · …`, có link tới hội thoại), lưu ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
+Kèm: hộp thư ở Open WebUI (tài khoản sở hữu API key): chat ghim **Tổng quan hộp thư**, folder **Cần xử lý / Đang chat / Đã xong**, mỗi khách 1 chat có thẻ khách và nút Đã gọi / Xong (chi tiết: `references/trien-khai.md`). Giao diện gọn hơn và bấm dòng trong Tổng quan để mở chat: cài `Agoobi/openwebui-custom`. Trả lời trong Open WebUI **không** tới khách. Lead còn lưu ở `chatbot/leads.jsonl` và được POST tới `lead_webhook` (ký HMAC).
 
 ## Cập nhật kiến thức (user gửi tài liệu mới bất cứ lúc nào)
 

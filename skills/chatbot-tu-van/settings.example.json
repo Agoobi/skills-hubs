@@ -16,9 +16,7 @@
   "open_webui": {
     "url": "https://chat.example.com",
     "api_key": "sk-DAN_API_KEY_OPEN_WEBUI_CUA_KHACH",
-    "model_label": "Chatbot Shop Mẫu",
-    "folder": "Tin nhắn từ chatbot website",
-    "lead_folder": "Khách cần tư vấn"
+    "model_label": "Chatbot Shop Mẫu"
   },
   "lead_webhook": {
     "url": "",
@@ -27,6 +25,7 @@
   "webchat": {
     "host": "127.0.0.1",
     "port": 8650,
+    "public_url": "https://bot.shopmau.vn",
     "allowed_origins": ["https://shopmau.vn", "https://www.shopmau.vn"],
     "title": "Tư vấn Shop Mẫu",
     "color": "#0f5c8c",

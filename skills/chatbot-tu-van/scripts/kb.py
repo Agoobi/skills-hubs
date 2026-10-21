@@ -32,6 +32,13 @@ PROTOCOL = "2025-06-18"
 def home(arg=None):
     if arg:
         return Path(arg).expanduser()
+    try:  # gateway nhieu profile (multiplex): env la cua profile mac dinh, home that nam o override theo luot
+        from hermes_constants import get_hermes_home_override
+        override = get_hermes_home_override()
+        if override:
+            return Path(override).expanduser() / "chatbot"
+    except ImportError:
+        pass
     if os.environ.get("CHATBOT_HOME"):
         return Path(os.environ["CHATBOT_HOME"]).expanduser()
     hh = os.environ.get("HERMES_HOME")

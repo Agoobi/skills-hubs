@@ -5,7 +5,8 @@ Khach dan 1 the script len website:
 widget.js goi:
     POST /api/chat       {"vid": "<id trinh duyet>", "text": "..."}  -> 202
     GET  /api/messages?vid=...&after=<seq>                          -> long-poll cau tra loi
-Moi vid la 1 phien Hermes rieng. Cau tra loi duoc chep sang Open WebUI (owui_mirror.py).
+    POST /owui/action    {"conv", "sig", "action"}  <- nut tren the khach trong Open WebUI (ky HMAC)
+Moi vid la 1 phien Hermes rieng. Hoi thoai duoc chep vao hop thu Open WebUI (owui_inbox.py).
 
 Cau hinh: $CHATBOT_HOME/settings.json > webchat {host, port, allowed_origins, title, color, greeting}.
 """
@@ -24,9 +25,9 @@ from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, SendResult
 
 try:
-    from .owui_mirror import Mirror
+    from .owui_inbox import get_inbox
 except ImportError:  # setup.py chua chep file
-    Mirror = None
+    get_inbox = None
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,12 @@ def guard_text(platform: str, user_id: str, text: str) -> str:
         logger.exception("[%s] guard loi, gui cau mau", platform)
         return getattr(g, "DEFAULT_FALLBACK", "Dạ anh/chị để lại số điện thoại, nhân viên sẽ liên hệ ạ.")
 
+# Thong bao loi cua Hermes (het han key, provider loi, qua tai...) gui qua send() nhu tin thuong: khong cho toi khach.
+SYSTEM_ERROR = re.compile(r"^\s*(❌|⚠️|🚫)|Provider said|rejected (the|your) (request|API key)|hermes setup|"
+                          r"Settings → Providers|Your request was not processed", re.I)
+SYSTEM_ERROR_TEXT = ("Dạ hệ thống tư vấn đang bận một chút. Anh/chị để lại tên và số điện thoại, "
+                     "nhân viên bên em sẽ liên hệ ngay ạ.")
+
 PLATFORM = "webchat"
 VID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 MAX_TEXT = 1000
@@ -54,6 +61,13 @@ IDLE_DROP = 6 * 3600  # bo trang thai cua vid khong hoat dong qua 6 gio
 
 
 def chatbot_home() -> Path:
+    try:  # gateway nhieu profile (multiplex): env la cua profile mac dinh, home that nam o override
+        from hermes_constants import get_hermes_home_override
+        override = get_hermes_home_override()
+        if override:
+            return Path(override).expanduser() / "chatbot"
+    except ImportError:
+        pass
     if os.getenv("CHATBOT_HOME"):
         return Path(os.environ["CHATBOT_HOME"]).expanduser()
     hh = os.getenv("HERMES_HOME")
@@ -75,7 +89,7 @@ class WebchatAdapter(BasePlatformAdapter):
         self.host = os.getenv("WEBCHAT_HOST") or self.cfg.get("host") or "127.0.0.1"
         self.port = int(os.getenv("WEBCHAT_PORT") or self.cfg.get("port") or 8650)
         self.origins = set(self.cfg.get("allowed_origins") or [])
-        self.mirror = Mirror(chatbot_home(), s.get("open_webui") or {}) if Mirror else None
+        self.inbox = get_inbox(chatbot_home(), s) if get_inbox else None
         self._outbox: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
         # seq bat dau tu thoi diem tao: sau khi khoi dong lai / don dep, seq moi luon lon hon seq cu cua trinh duyet
         self._seq: Dict[str, int] = defaultdict(lambda: int(time.time()) * 1000)
@@ -83,7 +97,6 @@ class WebchatAdapter(BasePlatformAdapter):
         self._waiters: Dict[str, asyncio.Event] = {}
         self._hits: Dict[str, deque] = defaultdict(deque)
         self._last: Dict[str, float] = {}
-        self._mirror_tasks: Dict[str, Any] = {}
         self._gc_at = time.time()
         self._runner = None
 
@@ -102,6 +115,7 @@ class WebchatAdapter(BasePlatformAdapter):
         app.router.add_route("OPTIONS", "/api/{tail:.*}", self._preflight)
         app.router.add_post("/api/chat", self._chat)
         app.router.add_get("/api/messages", self._messages)
+        app.router.add_post("/owui/action", self._owui_action)
         app.router.add_get("/health", lambda _: web.json_response({"ok": True, "platform": PLATFORM}))
         self._runner = web.AppRunner(app)
         await self._runner.setup()
@@ -124,17 +138,23 @@ class WebchatAdapter(BasePlatformAdapter):
         vid = chat_id.removeprefix("web-")
         if not chat_id.startswith("web-") or not VID_RE.match(vid):  # vd kenh nha "none" cua cron
             return SendResult(success=False, error=f"webchat: chat_id khong hop le {chat_id!r}")
+        if SYSTEM_ERROR.search(content or ""):
+            logger.warning("[webchat] chan thong bao loi he thong, khong gui khach: %s", (content or "")[:300])
+            if any(m["role"] == "bot" and m["text"] == SYSTEM_ERROR_TEXT for m in self._outbox[vid]
+                   if m["seq"] > self._seq[vid] - 2):
+                return SendResult(success=True, message_id=f"{vid}:{self._seq[vid]}")  # loi gui 2 tin: chi bao 1 lan
+            if self.inbox:
+                self.inbox.event(f"web:{vid}", "guard_blocked", {"ly_do": "Lỗi hệ thống (LLM / Hermes)",
+                                                                "tom_tat": (content or "")[:200]})
+            content = SYSTEM_ERROR_TEXT
         content = guard_text(PLATFORM, chat_id, content)
         self._last[vid] = time.time()
-        prev = self._mirror_tasks.get(vid)
-        if prev and not prev.done():  # chep tin khach truoc, giu dung thu tu ben Open WebUI
-            await asyncio.wait([prev], timeout=20)
         self._seq[vid] += 1
         self._outbox[vid].append({"seq": self._seq[vid], "role": "bot", "text": content, "time": int(time.time())})
         self._typing.pop(vid, None)
         self._wake(vid)
-        if self.mirror:
-            self.mirror.add_async(f"web:{vid}", f"Web · khách {vid[:6]}", "assistant", content)
+        if self.inbox:  # hang doi cua hop thu giu dung thu tu: tin khach da xep truoc tin nay
+            self.inbox.message(f"web:{vid}", "assistant", content)
         return SendResult(success=True, message_id=f"{vid}:{self._seq[vid]}")
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
@@ -202,7 +222,7 @@ class WebchatAdapter(BasePlatformAdapter):
             return
         self._gc_at = now
         for vid in [v for v, t in self._last.items() if now - t > IDLE_DROP]:
-            for d in (self._last, self._outbox, self._seq, self._typing, self._waiters, self._hits, self._mirror_tasks):
+            for d in (self._last, self._outbox, self._seq, self._typing, self._waiters, self._hits):
                 d.pop(vid, None)
         for k in [k for k, q in self._hits.items() if not q or q[-1] < now - RATE_POLL[1]]:
             self._hits.pop(k, None)
@@ -228,8 +248,8 @@ class WebchatAdapter(BasePlatformAdapter):
         self._seq[vid] += 1
         seq = self._seq[vid]
         self._outbox[vid].append({"seq": seq, "role": "user", "text": text, "time": int(time.time())})
-        if self.mirror:
-            self._mirror_tasks[vid] = self.mirror.add_async(f"web:{vid}", f"Web · khách {vid[:6]}", "user", text)
+        if self.inbox:
+            self.inbox.message(f"web:{vid}", "user", text, page=body.get("page"))
         source = self.build_source(chat_id=f"web-{vid}", chat_name=f"Web {vid[:6]}", chat_type="dm",
                                    user_id=f"web-{vid}", user_name=f"Khách web {vid[:6]}")
         event = MessageEvent(text=text, message_type=MessageType.TEXT, source=source,
@@ -238,6 +258,20 @@ class WebchatAdapter(BasePlatformAdapter):
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
         return self._cors(request, web.json_response({"ok": True, "seq": seq}, status=202))
+
+    async def _owui_action(self, request):
+        """Nut tren the khach (iframe sandbox cua Open WebUI, Origin "null"): xac thuc bang chu ky theo tung chat."""
+        from aiohttp import web
+        headers = {"Access-Control-Allow-Origin": "*"}
+        if not self._rate_ok("owui:" + self._client_ip(request), RATE):
+            return web.json_response({"ok": False, "error": "rate"}, status=429, headers=headers)
+        try:
+            body = json.loads(await request.text())
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            return web.json_response({"ok": False, "error": "json"}, status=400, headers=headers)
+        ok = bool(self.inbox) and self.inbox.action(str(body.get("conv", "")), str(body.get("action", "")),
+                                                   str(body.get("sig", "")))
+        return web.json_response({"ok": ok}, status=200 if ok else 403, headers=headers)
 
     async def _messages(self, request):
         from aiohttp import web

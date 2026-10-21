@@ -11,7 +11,7 @@ import argparse, hashlib, json, os, subprocess, sys, time, urllib.error, urllib.
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-PLUGINS = {"webchat": ["owui_mirror.py"], "chatbot_guard": ["kb.py", "owui_mirror.py"]}
+PLUGINS = {"webchat": ["owui_inbox.py"], "chatbot_guard": ["kb.py", "owui_inbox.py"]}
 KB_TOOLS = {"tim_kien_thuc", "doc_tai_lieu", "luu_khach_hang", "chuyen_nhan_vien"}
 PLACEHOLDER = ("DAN_", "_CUA_KHACH", "example.com", "shopmau.vn", "OA_SECRET_KEY_TRONG")
 
@@ -180,37 +180,34 @@ def check_data(home, chat, s, env):
         try:
             code, me = http("GET", ow["url"].rstrip("/") + "/api/v1/auths/", headers={"Authorization": f"Bearer {ow['api_key']}"})
             add("Open WebUI", True, f"API key cua: {me.get('name') or me.get('email')}")
-            check_folder(ow, "folder", "Open WebUI folder")
-            check_folder(ow, "lead_folder", "Open WebUI folder lead")
+            check_folders(ow)
         except (urllib.error.URLError, OSError, ValueError) as e:
             add("Open WebUI", False, f"{ow['url']}: {e}", "Kiem tra URL va API key (Admin phai bat API keys)")
 
     wc = s.get("webchat") or {}
     if not wc.get("allowed_origins") or any(is_placeholder(o) for o in wc["allowed_origins"]):
         add("webchat.allowed_origins", False, str(wc.get("allowed_origins")), "Dien domain website, vd https://shop.vn")
+    if not str(wc.get("public_url") or "").startswith("https://"):
+        warn("webchat.public_url", "Chua dien: the khach trong Open WebUI se khong co nut Da goi / Xong",
+             "Dien URL https cua bot, vd https://bot.shop.vn")
 
 
-
-def check_folder(ow, key, label):
-    name = (ow.get(key) or "").strip()
-    if not name:
-        add(label, True, "khong dat: chat khach nam ngoai folder" if key == "folder" else "khong dat: khong bao lead vao Open WebUI")
-        return
+def check_folders(ow):
+    """3 folder cua hop thu (Can xu ly / Dang chat / Da xong): chi doc, bot tu tao khi can."""
     sys.path.insert(0, str(SKILL / "scripts"))
-    from owui_mirror import Mirror, UUID_RE
-    m = Mirror(Path("."), {**ow, "folder": name})
+    from owui_inbox import FOLDERS
     try:
-        fid = m.folder_id(create=False)  # check.py chi doc, khong tao folder
-    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as e:
-        add(label, False, f"{name}: {e}", "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
+        code, folders = http("GET", ow["url"].rstrip("/") + "/api/v1/folders/",
+                             headers={"Authorization": f"Bearer {ow['api_key']}"})
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        add("Open WebUI folders", False, str(e), "Tai khoan cua API key phai duoc dung Folders (Admin > Users > Permissions)")
         return
-    if fid:
-        add(label, True, f"{name} -> {fid}")
-    elif UUID_RE.match(name):
-        add(label, False, f"Khong thay folder id {name}",
-            "Dung ten folder, hoac id lay tu URL .../folders/<id> cua dung tai khoan so huu API key")
+    have = {(f.get("name") or "").strip() for f in folders or [] if not f.get("parent_id")}
+    missing = [n for n in FOLDERS.values() if n not in have]
+    if missing:
+        warn("Open WebUI folders", f"Chua co {missing}: bot se tu tao khi co khach nhan", "")
     else:
-        warn(label, f"Chua co folder '{name}': bot se tu tao khi can", "")
+        add("Open WebUI folders", True, ", ".join(FOLDERS.values()))
 
 
 def check_running(s, env):
