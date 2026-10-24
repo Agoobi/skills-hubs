@@ -1,0 +1,17 @@
+name: webchat
+label: Chat website
+kind: platform
+version: 0.1.0
+description: >
+  Khung chat nhung len website (widget.js). Moi khach truy cap la 1 phien Hermes rieng,
+  hoi thoai duoc chep sang Open WebUI. Cai bang skill chatbot-tu-van (scripts/setup.py).
+author: Agoobi
+optional_env:
+  - name: WEBCHAT_PORT
+    description: "Cong HTTP cua widget (mac dinh 8650)"
+    prompt: "Webchat port"
+    password: false
+  - name: WEBCHAT_ALLOW_ALL_USERS
+    description: "true: cho moi khach website chat (bat buoc voi chatbot cong khai)"
+    prompt: "Allow all users"
+    password: false
