@@ -8,6 +8,15 @@ metadata:
   hermes:
     category: coquifly
     tags: [zalo, zalo-oa, bai-viet, vietnamese]
+required_environment_variables:
+  - name: ZALO_APP_ID
+    prompt: App ID của app Zalo (developers.zalo.me) đã liên kết với OA
+    help: "developers.zalo.me → app → Thông tin ứng dụng"
+    required_for: "làm mới token OA, kết nối OA"
+  - name: ZALO_APP_SECRET
+    prompt: Khóa bí mật (App Secret) của app Zalo đó
+    help: "developers.zalo.me → app → Thông tin ứng dụng → Khóa bí mật"
+    required_for: "làm mới token OA, kết nối OA"
 ---
 
 # viet-bai-zalo-oa
