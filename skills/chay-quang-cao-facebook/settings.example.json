@@ -1,0 +1,61 @@
+{
+  "execution": "bm",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "currency": "VND",
+  "meta": {
+    "access_token": "DAN_TOKEN_SYSTEM_USER_VAO_DAY_HOAC_DUNG_ENV",
+    "graph_version": "v21.0",
+    "business_id": "ID_BUSINESS_MANAGER",
+    "default_ad_account": "act_ID_TAI_KHOAN_CHINH",
+    "ad_accounts": []
+  },
+  "zernio": {
+    "api_key": "sk_DAN_KEY_ZERNIO_VAO_DAY",
+    "base_url": "https://zernio.com/api/v1"
+  },
+  "pages": {
+    "page-chinh": {
+      "page_id": "ID_FANPAGE",
+      "label": "Fanpage chính"
+    }
+  },
+  "pixels": {
+    "web-chinh": {
+      "pixel_id": "ID_PIXEL",
+      "domain": "example.com",
+      "events": ["Purchase", "Lead", "CompleteRegistration"]
+    }
+  },
+  "forbidden_landing_domains": [],
+  "test_scale": {
+    "result_type": null,
+    "target_cost_per_result": null,
+    "max_daily_budget_total": null,
+    "test_loss_limit": null,
+    "spend_per_ad_reference": 250000,
+    "no_result_spend_multiplier": 1.5,
+    "ctr_warn_pct": 1,
+    "frequency_warn": 3,
+    "baseline_days": 3,
+    "deterioration_trigger_pct": 30,
+    "budget_cut_pct": 30,
+    "cooldown_hours": 48,
+    "scale_step_pct": 20,
+    "scale_step_max_pct": 30,
+    "exclusion_window_days": 7
+  },
+  "alerts": {
+    "overspend_pct": 25,
+    "no_delivery_after_hour": 8,
+    "slow_after_hour": 20,
+    "slow_spend_pct": 50,
+    "min_spend_to_judge": 50000,
+    "thresholds": {
+      "OUTCOME_ENGAGEMENT": { "max_cost_per_result": null, "max_cpc": null, "min_ctr_pct": null },
+      "OUTCOME_SALES": { "max_cost_per_result": null, "max_cpc": null, "min_ctr_pct": 1 },
+      "OUTCOME_LEADS": { "max_cost_per_result": null, "max_cpc": null, "min_ctr_pct": 1 },
+      "OUTCOME_TRAFFIC": { "max_cost_per_result": null, "max_cpc": null, "min_ctr_pct": 1 },
+      "default": {}
+    }
+  }
+}
