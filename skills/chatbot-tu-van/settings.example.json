@@ -1,0 +1,34 @@
+{
+  "business": {
+    "ten": "Shop Mẫu",
+    "hotline": "0901 234 567",
+    "zalo": "0901 234 567",
+    "gio_lam_viec": "8:00 - 21:00 hằng ngày",
+    "website": "https://shopmau.vn"
+  },
+  "thu_thap_khach": ["ten", "sdt"],
+  "fallback_text": "",
+  "guard": {
+    "enabled": true,
+    "platforms": ["webchat"],
+    "max_passages": 5
+  },
+  "open_webui": {
+    "url": "http://127.0.0.1:8080",
+    "public_url": "https://chat.shopmau.vn",
+    "roles": ["admin"]
+  },
+  "lead_webhook": {
+    "url": "",
+    "secret": ""
+  },
+  "webchat": {
+    "host": "127.0.0.1",
+    "port": 8650,
+    "public_url": "https://bot.shopmau.vn",
+    "allowed_origins": ["https://shopmau.vn", "https://www.shopmau.vn"],
+    "title": "Tư vấn Shop Mẫu",
+    "color": "#0f5c8c",
+    "greeting": "Xin chào! Em là trợ lý của Shop Mẫu. Anh/chị cần tư vấn gì ạ?"
+  }
+}
