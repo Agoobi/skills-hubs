@@ -1,0 +1,19 @@
+{
+  "default_site": "shop",
+  "sites": {
+    "shop": {
+      "label": "Website Shop Mẫu",
+      "url": "https://shopmau.vn",
+      "username": "ten-dang-nhap-wordpress",
+      "app_password": "DAN_APPLICATION_PASSWORD_VAO_DAY",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "default_category": "Tin tức",
+      "brand_voice": "Chuyên nghiệp, dễ hiểu, xưng 'chúng tôi', câu ngắn.",
+      "audience": "Chủ shop online, doanh nghiệp nhỏ",
+      "default_cta": "Liên hệ hotline 0901 234 567 để được tư vấn.",
+      "seo_keywords": [],
+      "avoid": ["cam kết 100%", "rẻ nhất thị trường"],
+      "length": "800-1200 từ"
+    }
+  }
+}
