@@ -74,6 +74,19 @@
       "agents": ["hermes"],
       "requires": { "toolsets": ["terminal"], "env": ["ZALO_APP_ID", "ZALO_APP_SECRET"] },
       "featured": false
+    },
+    {
+      "id": "chay-quang-cao-facebook",
+      "path": "skills/chay-quang-cao-facebook",
+      "name": "Bot Chạy Quảng cáo Facebook",
+      "summary": "Lên kế hoạch, dựng camp PAUSED, báo cáo và test/scale quảng cáo Meta qua token BM hoặc Zernio",
+      "category": "marketing",
+      "icon": "megaphone",
+      "tags": ["facebook-ads", "meta-ads", "zernio", "business-manager", "report"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["web", "terminal"], "env": ["FACEBOOK_ACCESS_TOKEN"], "env_alternatives": [["ZERNIO_API_KEY"]] },
+      "featured": false
     }
   ]
 }
