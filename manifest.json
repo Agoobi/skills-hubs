@@ -87,6 +87,19 @@
       "agents": ["hermes"],
       "requires": { "toolsets": ["web", "terminal"], "env": ["FACEBOOK_ACCESS_TOKEN"], "env_alternatives": [["ZERNIO_API_KEY"]] },
       "featured": false
+    },
+    {
+      "id": "sua-landing-page-aiagentvn",
+      "path": "skills/sua-landing-page-aiagentvn",
+      "name": "Bot Sửa Landing Page aiagentvn.com",
+      "summary": "Sửa landing page theo lời admin, xem trước, mở PR, deploy main qua OnePanel MCP có sao lưu và rollback",
+      "category": "operations",
+      "icon": "layout-template",
+      "tags": ["landing-page", "aiagentvn", "deploy", "onepanel", "github"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal", "browser"], "env": ["ONEPANEL_MCP_URL", "ONEPANEL_MCP_TOKEN"] },
+      "featured": false
     }
   ]
 }
