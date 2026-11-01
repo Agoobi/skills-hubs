@@ -105,7 +105,7 @@
       "id": "dung-video-tho-nhan-vat-dan",
       "path": "skills/dung-video-tho-nhan-vat-dan",
       "name": "Bot Dựng Video Thô có Nhân vật dẫn",
-      "summary": "Nhận video quay thô, tự cắt, dừng hình cho nhân vật hoạt hình giải thích, zoom, chèn ảnh minh hoạ, lồng giọng và xuất mp4",
+      "summary": "Nhận video quay thô, tự cắt, dừng hình cho nhân vật hoạt hình giải thích, zoom, chèn ảnh, lồng giọng, xuất mp4",
       "category": "marketing",
       "icon": "clapperboard",
       "tags": ["video", "edit", "screen-recording", "presenter", "hyperframes"],
