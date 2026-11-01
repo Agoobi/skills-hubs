@@ -1,0 +1,17 @@
+{
+  "name": "video-tho-nhan-vat-dan",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npx --yes hyperframes@0.8.226 check",
+    "preview": "npx --yes hyperframes@0.8.226 preview",
+    "render": "npx --yes hyperframes@0.8.226 render"
+  },
+  "dependencies": {
+    "@fontsource/be-vietnam-pro": "5.3.0",
+    "@opeepsfun/open-peeps": "1.0.6",
+    "gsap": "3.14.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

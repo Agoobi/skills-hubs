@@ -1,0 +1,117 @@
+{
+ "BlazerColorPants": {
+  "x": 751,
+  "y": 2,
+  "w": 154
+ },
+ "BlazerColorTee": {
+  "x": 751,
+  "y": 2,
+  "w": 154
+ },
+ "CrossArmColorPants": {
+  "x": 755,
+  "y": 2,
+  "w": 130
+ },
+ "CrossArmColorTee": {
+  "x": 745,
+  "y": 0,
+  "w": 142
+ },
+ "Dancer": {
+  "x": 746,
+  "y": 0,
+  "w": 144
+ },
+ "Doc": {
+  "x": 745,
+  "y": 0,
+  "w": 158
+ },
+ "DocHazardous": {
+  "x": 744,
+  "y": 0,
+  "w": 152
+ },
+ "DocStethoscope": {
+  "x": 745,
+  "y": 2,
+  "w": 150
+ },
+ "EasingColorPants": {
+  "x": 754,
+  "y": 0,
+  "w": 152
+ },
+ "EasingColorTee": {
+  "x": 754,
+  "y": 0,
+  "w": 152
+ },
+ "PointingFingerColorPants": {
+  "x": 740,
+  "y": 2,
+  "w": 128
+ },
+ "PointingFingerColorTee": {
+  "x": 740,
+  "y": 2,
+  "w": 128
+ },
+ "Polkadots": {
+  "x": 729,
+  "y": 2,
+  "w": 158
+ },
+ "ProthesisColorPants": {
+  "x": 752,
+  "y": 0,
+  "w": 156
+ },
+ "ProthesisColorTee": {
+  "x": 752,
+  "y": 0,
+  "w": 156
+ },
+ "RestingColorPants": {
+  "x": 751,
+  "y": 0,
+  "w": 138
+ },
+ "RestingColorTee": {
+  "x": 751,
+  "y": 0,
+  "w": 138
+ },
+ "ShirtColorPants": {
+  "x": 746,
+  "y": 0,
+  "w": 144
+ },
+ "ShirtColorTee": {
+  "x": 746,
+  "y": 0,
+  "w": 144
+ },
+ "ShirtProthesisColorPants": {
+  "x": 747,
+  "y": 2,
+  "w": 154
+ },
+ "ShirtProthesisColorTee": {
+  "x": 745,
+  "y": 0,
+  "w": 154
+ },
+ "WalkingColorPants": {
+  "x": 745,
+  "y": 0,
+  "w": 146
+ },
+ "WalkingColorTee": {
+  "x": 745,
+  "y": 0,
+  "w": 146
+ }
+}
