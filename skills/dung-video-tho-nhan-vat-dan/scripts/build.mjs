@@ -304,9 +304,9 @@ function cutawayBeat(beat, info) {
     : presenterStand(id, { pose: beat.presenter?.pose || "explain", side, feet: PORTRAIT ? { x: W / 2, y: H - 30 } : { x: side === "left" ? 300 : W - 300, y: H - 34 }, height: PORTRAIT ? H * 0.42 : H * 0.84 });
   const area = PORTRAIT ? { x: 70, y: 150, w: W - 140, h: H * 0.5 }
     : pres ? { x: side === "left" ? 620 : 100, y: 110, w: W - 720, h: H - 220 } : { x: 160, y: 110, w: W - 320, h: H - 220 };
-  let js = popIn(`#${id}-title`, 0.15);
+  let js = info.start === 0 ? "" : popIn(`#${id}-title`, 0.15); // khung đầu là ảnh xem trước, chữ phải có sẵn
   if (pres) {
-    js += `tl.fromTo("#${id}-pres",{y:${n(H - pres.top)}},{y:0,duration:0.5,ease:"power3.out"},0.05);`;
+    if (info.start !== 0) js += `tl.fromTo("#${id}-pres",{y:${n(H - pres.top)}},{y:0,duration:0.5,ease:"power3.out"},0.05);`;
     js += breathe(id, 0.6, D - 1);
     if (info.mouth) js += mouthTweens(id, info.mouth, info.vo_start, info.voice_len);
   }
