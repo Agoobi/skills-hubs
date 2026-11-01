@@ -1,0 +1,30 @@
+{
+  "voice": "vieneu:DAN_ID_GIONG_VAO_DAY",
+  "voice_style": "",
+  "speed": 1.0,
+  "emotion": "",
+  "vieneu": {
+    "api_key": "DAN_KEY_VIENEU_VAO_DAY",
+    "base_url": "https://api.vieneu.io/api/v1"
+  },
+  "openrouter": {
+    "api_key": "sk-or-v1-DAN_KEY_OPENROUTER_VAO_DAY",
+    "base_url": "https://openrouter.ai/api/v1",
+    "tts_model": "google/gemini-3.1-flash-tts-preview"
+  },
+  "presenter": {
+    "name": "anh Que",
+    "hair": "ShortFour",
+    "skin": "#F1C7A0",
+    "hairColor": "#2A2320",
+    "top": "#121826",
+    "pants": "#FF5C7A",
+    "beard": "",
+    "accessory": ""
+  },
+  "theme": {
+    "accent": "#2563FF",
+    "bg": "#F4F6FB",
+    "ink": "#121826"
+  }
+}
