@@ -7,13 +7,14 @@
   "captions": true,
   "music": { "file": "assets/nhac.mp3", "volume": 0.08 },
   "blur": [{ "rect": [1, 14, 16, 60], "from": 0, "to": 30 }],
-  "labels": { "pause": "Tạm dừng", "fast": "Tua nhanh" },
+  "labels": { "pause": "Tạm dừng", "fast": "Tua nhanh", "sample": "Dữ liệu ví dụ" },
   "beats": []
 }
 ```
 
 - `blur`: làm mờ trực tiếp vào hình. `from`, `to` là giây trong video thô; bỏ cả hai thì mờ suốt video.
 - `music`: không bắt buộc. Tự lặp cho đủ độ dài.
+- `labels.sample`: nhãn cố định ở góc video. Dùng khi hình là dữ liệu mẫu, không phải khách thật.
 - `beats`: chạy lần lượt từ đầu tới cuối. `id` viết thường, không dấu.
 
 ## Bốn loại nhịp
@@ -49,7 +50,15 @@ Video đứng ở giây `at`, thu nhỏ sang một bên, nhân vật đi vào n�
 { "id": "tom-tat", "type": "cutaway", "title": "Ba việc cần nhớ", "points": ["Quay quy trình thật", "Đánh dấu chỗ lặp lại"], "image": "assets/overlays/so-do.png", "vo": "..." }
 ```
 
-Dùng cho hook, tóm tắt, so sánh trước/sau, kêu gọi cuối video. `points` hiện dần theo lời; thêm `{ "text": "...", "on": "cụm từ" }` để khớp đúng chữ. `presenter: false` để bỏ nhân vật.
+Dùng cho hook, tóm tắt, so sánh trước/sau, kêu gọi cuối video. `points` hiện dần theo lời; thêm `{ "text": "...", "on": "cụm từ" }` để khớp đúng chữ. `presenter: false` để bỏ nhân vật. `note`: dòng phụ, ví dụ ghi rõ số giả định.
+
+Ba khối đồ hoạ dùng được trong cảnh riêng:
+
+| Trường | Dạng | Dùng cho |
+|---|---|---|
+| `flow` | `["Đọc tin", "Mở bảng giá"]` | Sơ đồ quy trình, các ô hiện dần theo lời. Thêm `focus: { "nodes": [1], "on": "một khâu" }` để hiện cả sơ đồ rồi làm nổi các ô chọn. |
+| `big` | `[{ "text": "4 phút", "on": "bốn phút" }]` | Phép tính chữ lớn, phần tử cuối là kết quả. |
+| `compare` | `{ "before": { "title", "items", "on" }, "after": { ... } }` | Hai thẻ trước/sau. |
 
 ### `chapter`: thẻ chương
 

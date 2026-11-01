@@ -71,7 +71,7 @@ python -I scripts/raw.py tts <ten-video> --dry   # xem số ký tự sẽ tính 
 python -I scripts/raw.py tts <ten-video>
 ```
 
-Lệnh chỉ đọc lại câu đã đổi, nên sửa một câu không tốn cả video. Cho người dùng nghe vài câu. Sai dấu hay đọc sai số thì sửa cách viết trong `vo` rồi chạy lại. Người dùng tự thu thì đặt file vào dự án và điền `voFile`, không cần `tts`.
+Lệnh chỉ đọc lại câu đã đổi, nên sửa một câu không tốn cả video. Cho người dùng nghe vài câu. Sai dấu hay đọc sai số thì sửa cách viết trong `vo` rồi chạy lại. Người dùng tự thu thì đặt file vào dự án và điền `voFile`, không cần `tts`. Cần giọng tạm để duyệt hình mà chưa muốn tốn phí thì tạo bằng gói pip `vieneu` chạy trên máy rồi cũng điền `voFile`.
 
 **Cổng 6 — Dựng và xem trước.**
 

@@ -22,6 +22,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const css = (o) => Object.entries(o).map(([k, v]) => `${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}:${typeof v === "number" ? n(v) + "px" : v}`).join(";");
 const box = ({ x, y, w, h }) => css({ left: x, top: y, width: w, height: h });
+const SAMPLE = plan.labels?.sample ? `<div class="sample">${esc(plan.labels.sample)}</div>` : "";
 
 // ---------- Bố cục ----------
 const ASPECT = src.width / src.height;
@@ -165,7 +166,8 @@ function highlightHTML(id, o, t, d, scale, stage) {
   const [x, y, w, h] = o.rect;
   const below = y + h < 78;
   const size = n(30 / scale);
-  const label = o.label ? `<div class="hl-label" style="${below ? "top:100%;margin-top:" + n(14 / scale) : "bottom:100%;margin-bottom:" + n(14 / scale)}px;font-size:${size}px;padding:${n(10 / scale)}px ${n(20 / scale)}px;border-radius:${n(14 / scale)}px">${esc(o.label)}</div>` : "";
+  const anchor = x + w / 2 > 60 ? "right:0" : "left:0"; // nhãn nằm trong khung video, không tràn mép
+  const label = o.label ? `<div class="hl-label" style="${anchor};${below ? "top:100%;margin-top:" + n(14 / scale) : "bottom:100%;margin-bottom:" + n(14 / scale)}px;font-size:${size}px;padding:${n(10 / scale)}px ${n(20 / scale)}px;border-radius:${n(14 / scale)}px">${esc(o.label)}</div>` : "";
   return `<div class="clip hl" id="${id}" data-start="${n(t)}" data-duration="${n(d)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"><div class="hl-in" id="${id}-in" style="border-width:${n(6 / scale)}px;border-radius:${n(14 / scale)}px">${label}</div></div>`;
 }
 
@@ -261,7 +263,7 @@ function playBeat(beat, info) {
   }
   const capY = PORTRAIT ? REST.y + REST.h + 24 : H - 104;
   html += fx.over + captions(id, beat, info, capY);
-  return { body: `<div class="stage" id="${id}-stage" data-layout-allow-overflow style="${box(REST)}"><div class="cam" id="${id}-cam">${mediaHTML(id, beat, info)}${fx.inCam}</div></div>${html}`, js };
+  return { body: `<div class="stage" id="${id}-stage" data-layout-allow-overflow style="${box(REST)}"><div class="cam" id="${id}-cam">${mediaHTML(id, beat, info)}${fx.inCam}</div>${SAMPLE}</div>${html}`, js };
 }
 
 function pauseBeat(beat, info) {
@@ -290,7 +292,7 @@ function pauseBeat(beat, info) {
   sfxEvents.push({ t: info.start + 0.04, k: "whoosh", v: 0.18 });
   const pausePill = `<div class="pill" id="${id}-paused" style="${css({ left: inner.x + 22, top: inner.y + 22, width: 226 })}"><i></i><i></i>${esc(LABEL_PAUSE)}</div>`;
   return {
-    body: `<div class="stage" id="${id}-stage" data-layout-allow-overflow style="${box(REST)}"><div class="cam" id="${id}-cam">${mediaHTML(id, beat, info)}${fx.inCam}</div></div>${pres.html}${pausePill}${fx.over}${captions(id, beat, info, layout.capY)}`,
+    body: `<div class="stage" id="${id}-stage" data-layout-allow-overflow style="${box(REST)}"><div class="cam" id="${id}-cam">${mediaHTML(id, beat, info)}${fx.inCam}</div>${SAMPLE}</div>${pres.html}${pausePill}${fx.over}${captions(id, beat, info, layout.capY)}`,
     js,
   };
 }
@@ -322,7 +324,43 @@ function cutawayBeat(beat, info) {
     img = `<img class="cut-img" id="${id}-img" src="${esc(beat.image)}" alt="">`;
     js += popIn(`#${id}-img`, 0.45);
   }
-  const body = `<div class="cut" style="${box(area)}"><div class="cut-title" id="${id}-title">${esc(beat.title || "")}</div>${list ? `<ul class="cut-list">${list}</ul>` : ""}${img}</div>${pres ? pres.html : ""}${captions(id, beat, info, PORTRAIT ? H * 0.53 : H - 104)}`;
+  const paced = (i, count, share) => info.vo_start + ((info.voice_len || D) * share * i) / count;
+  let extra = "";
+  if (beat.flow) {
+    const focus = beat.focus?.nodes;
+    extra += `<div class="flow">${beat.flow.map((t, i) => `<div class="node" id="${id}-n${i}"><b>${i + 1}</b><span>${esc(t)}</span></div>`).join("")}</div>`;
+    beat.flow.forEach((_, i) => {
+      const t = focus ? 0.2 + i * 0.06 : paced(i, beat.flow.length, 0.78);
+      js += popIn(`#${id}-n${i}`, t);
+      if (!focus) sfxEvents.push({ t: info.start + t, k: "tick", v: 0.25 });
+    });
+    if (focus) {
+      const t = when(beat.focus, beat, info);
+      beat.flow.forEach((_, i) => {
+        js += focus.includes(i) ? `tl.to("#${id}-n${i}",{scale:1.02,backgroundColor:"${THEME.accent}",color:"#fff",duration:0.35,ease:"power2.out"},${n(t)});` : `tl.to("#${id}-n${i}",{opacity:0.32,duration:0.35},${n(t)});`;
+      });
+      sfxEvents.push({ t: info.start + t, k: "pop", v: 0.3 });
+    }
+  }
+  if (beat.big) {
+    extra += `<div class="big">${beat.big.map((o, i) => `<div id="${id}-b${i}">${esc(o.text)}</div>`).join("")}</div>`;
+    beat.big.forEach((o, i) => {
+      const t = when(o, beat, info);
+      js += popIn(`#${id}-b${i}`, t);
+      sfxEvents.push({ t: info.start + t, k: "pop", v: 0.3 });
+    });
+  }
+  if (beat.compare) {
+    const card = (c, key) => `<div class="cmp-card" id="${id}-${key}"><b>${esc(c.title)}</b><ul>${c.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+    extra += `<div class="cmp">${card(beat.compare.before, "before")}${card(beat.compare.after, "after")}</div>`;
+    js += popIn(`#${id}-before`, when(beat.compare.before, beat, info)) + popIn(`#${id}-after`, when(beat.compare.after, beat, info));
+    sfxEvents.push({ t: info.start + when(beat.compare.after, beat, info), k: "pop", v: 0.3 });
+  }
+  if (beat.note) {
+    extra += `<div class="cut-note" id="${id}-note">${esc(beat.note)}</div>`;
+    js += popIn(`#${id}-note`, D * 0.55);
+  }
+  const body = `<div class="cut" style="${box(area)}"><div class="cut-title" id="${id}-title">${esc(beat.title || "")}</div>${list ? `<ul class="cut-list">${list}</ul>` : ""}${extra}${img}</div>${pres ? pres.html : ""}${captions(id, beat, info, PORTRAIT ? H * 0.53 : H - 104)}`;
   return { body, js };
 }
 
@@ -367,7 +405,7 @@ ${FONT_CSS}
 .media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .hl { position: absolute; }
 .hl-in { position: absolute; inset: 0; border-style: solid; border-color: ${THEME.accent}; box-shadow: 0 0 0 4000px rgba(10,14,30,.46); }
-.hl-label { position: absolute; left: 0; white-space: nowrap; background: ${THEME.accent}; color: #fff; font-weight: 700; }
+.hl-label { position: absolute; white-space: nowrap; background: ${THEME.accent}; color: #fff; font-weight: 700; }
 .ptr { position: absolute; left: 0; top: 0; pointer-events: none; }
 .ov { position: absolute; display: flex; padding: 40px; }
 .ov-card { background: #fff; border-radius: 24px; padding: 14px; box-shadow: 0 24px 70px rgba(15,20,36,.32); }
@@ -387,6 +425,18 @@ ${FONT_CSS}
 .cut-list { list-style: none; display: grid; gap: 20px; margin: 0; padding: 0; font-size: ${PORTRAIT ? 44 : 40}px; font-weight: 500; line-height: 1.3; }
 .cut-list li { padding-left: 34px; border-left: 8px solid ${THEME.accent}; }
 .cut-img { display: block; max-width: 100%; max-height: 52%; align-self: flex-start; border-radius: 22px; box-shadow: 0 24px 70px rgba(15,20,36,.24); }
+.flow { display: grid; grid-template-columns: repeat(${PORTRAIT ? 2 : 3}, 1fr); gap: 18px; }
+.node { display: flex; align-items: center; gap: 14px; min-height: 104px; padding: 16px 20px; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(15,20,36,.08); font-size: 32px; font-weight: 700; line-height: 1.2; }
+.node b { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: ${THEME.accent}; color: #fff; font-size: 28px; }
+.big { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; font-size: ${PORTRAIT ? 60 : 68}px; font-weight: 800; letter-spacing: -.02em; }
+.big div:last-child { width: 100%; color: ${THEME.accent}; font-size: ${PORTRAIT ? 80 : 92}px; }
+.cmp { display: grid; grid-template-columns: repeat(${PORTRAIT ? 1 : 2}, 1fr); gap: 22px; }
+.cmp-card { padding: 28px 30px; border-radius: 22px; background: #fff; box-shadow: 0 10px 30px rgba(15,20,36,.08); }
+.cmp-card:last-child { background: ${THEME.accent}; color: #fff; }
+.cmp-card b { display: block; margin-bottom: 14px; font-size: 40px; font-weight: 800; }
+.cmp-card ul { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; font-size: 32px; font-weight: 500; line-height: 1.3; }
+.cut-note { font-size: 30px; font-weight: 500; opacity: .72; }
+.sample { position: absolute; left: 22px; bottom: 22px; padding: 8px 18px; border-radius: 12px; background: rgba(15,20,36,.84); color: #fff; font-size: 28px; font-weight: 700; }
 .chap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 0 120px; text-align: center; color: #fff; }
 .chap-k { font-size: 34px; font-weight: 700; letter-spacing: .08em; opacity: .85; }
 .chap-t { font-size: ${PORTRAIT ? 88 : 96}px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; }
