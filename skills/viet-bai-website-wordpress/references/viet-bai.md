@@ -27,7 +27,7 @@ Markdown, script tự chuyển sang HTML (hiện trong khối "Classic" của tr
 ![Mô tả ảnh](anh/hinh-1.jpg)
 ```
 
-Ảnh trong bài là file local (đường dẫn tính từ thư mục file .md) hoặc URL: script upload vào Media Library và thay link. Dòng bắt đầu bằng `<` được giữ nguyên là HTML (vd khung nhúng YouTube). Có thể đưa file `.html` thay cho `.md`.
+Ảnh trong bài là file local (đường dẫn tính từ thư mục file .md) hoặc URL: `lich.py save` tải vào Lịch đăng (hiện trong preview), tới giờ đăng mới upload vào Media Library và thay link. Dòng bắt đầu bằng `<` được giữ nguyên là HTML (vd khung nhúng YouTube). Có thể đưa file `.html` thay cho `.md`.
 
 ## settings.json (mỗi site)
 
@@ -35,7 +35,7 @@ Markdown, script tự chuyển sang HTML (hiện trong khối "Classic" của tr
 |---|---|
 | `url` | Địa chỉ site, vd `https://shop.vn` (không có `/` cuối) |
 | `username` | Tên đăng nhập WordPress của tài khoản tạo Application Password |
-| `app_password` | Application Password (Users → Profile → Application Passwords). Hoặc env `WP_APP_PASSWORD_<ALIAS>` (vd `WP_APP_PASSWORD_SHOP`), env được ưu tiên |
-| `timezone` | Múi giờ khi lên lịch, nên trùng Settings → General của site |
+| `app_password` | Chỉ cho cách cũ (máy chưa có Lịch đăng). Có Lịch đăng thì nhập Application Password trong Lịch đăng → Cài đặt → Kết nối WordPress, để trống ở đây. Env `WP_APP_PASSWORD_<ALIAS>` được ưu tiên |
+| `timezone` | Chỉ cho cách cũ. Có Lịch đăng thì múi giờ đặt trong Lịch đăng → Cài đặt |
 | `default_category` | Chuyên mục mặc định khi user không chọn (phải có sẵn) |
 | `brand_voice`, `audience`, `default_cta`, `seo_keywords`, `avoid`, `length` | Giọng văn và quy ước viết của site |
