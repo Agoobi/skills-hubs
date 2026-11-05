@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Lich dang: dua bai vao lich dang cua Open WebUI (openwebui-custom), xem truoc trong chat, hen gio dang.
 
-Bai nam trong Lich dang cua Open WebUI; dung gio, may chu gui len WordPress qua REST API (Dang that hoac Luu nhap tren
-WordPress). Nguoi dung xem, doi gio, huy lich ngay tren trang "Lich dang" cua Open WebUI.
+Bai nam trong Lich dang cua Open WebUI; dung gio, may chu gui di: WordPress qua REST API (Dang that / Luu nhap) hoac
+Zalo OA (Hien ngay / Tao bai an). Nguoi dung xem, doi gio, huy lich ngay tren trang "Lich dang" cua Open WebUI.
+Cung 1 file trong skill viet-bai-website-wordpress va viet-bai-zalo-oa (tu chua, khong import file khac).
 
 Lenh: status | sites | categories | slots | save | media | preview | schedule | unschedule | mode | get | list
 Ket qua in JSON de agent doc. Chi dung thu vien chuan (Python 3.9+).
@@ -12,13 +13,11 @@ http://127.0.0.1:8080/api/v1/cqf/lich. Agent KHONG duoc sua ket noi WordPress ha
 """
 from __future__ import annotations
 
-import argparse, html, json, mimetypes, os, re, sys, urllib.error, urllib.parse, urllib.request, uuid
+import argparse, html, json, mimetypes, os, re, sys, unicodedata, urllib.error, urllib.parse, urllib.request, uuid
 from html.parser import HTMLParser
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from wordpress import md_to_html, read_content, safe_name  # noqa: E402  (cung skill: Markdown -> HTML)
 
 API = os.environ.get("LICH_API", "http://127.0.0.1:8080/api/v1/cqf/lich")
 AGENT_FILES = [os.environ.get("LICH_AGENT_FILE", ""), "/opt/open-webui/data/cqf/lich/agent.json",
@@ -104,14 +103,105 @@ def load_image(src):
     return data, ctype, safe_name(name)
 
 
-# ------------------------------------------------------------------ sites (alias cua skill -> site trong Lich dang)
+# ------------------------------------------------------------------ Markdown -> HTML (Lich dang luu HTML)
+
+def _inline(t):
+    t = html.escape(t, quote=False)
+    t = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)",
+               lambda m: f'<img src="{m[2].replace(chr(34), "%22")}" alt="{m[1].replace(chr(34), "&quot;")}" />', t)
+    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{m[2].replace(chr(34), "%22")}">{m[1]}</a>', t)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+    t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", t)
+    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+    return t
+
+
+def md_to_html(md):
+    """Markdown co ban -> HTML. Dong chi co anh la 1 khoi anh rieng (Zalo OA can vay)."""
+    lines, outp, para, lst = md.replace("\r\n", "\n").split("\n"), [], [], None
+
+    def flush():
+        nonlocal para, lst
+        if para:
+            outp.append("<p>" + "<br />".join(_inline(x) for x in para) + "</p>")
+            para = []
+        if lst:
+            tag, items = lst
+            outp.append(f"<{tag}>" + "".join(f"<li>{_inline(i)}</li>" for i in items) + f"</{tag}>")
+            lst = None
+
+    for line in lines:
+        st = line.strip()
+        if not st:
+            flush()
+            continue
+        if st.startswith("<") and st.endswith(">"):  # dong HTML co san: giu nguyen
+            flush()
+            outp.append(st)
+            continue
+        if re.fullmatch(r"!\[[^\]]*\]\([^)\s]+\)", st):
+            flush()
+            outp.append(_inline(st))
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*)$", st)
+        if m:
+            flush()
+            level = max(2, len(m[1]))  # H1 la tieu de bai, noi dung bat dau tu H2
+            outp.append(f"<h{level}>{_inline(m[2])}</h{level}>")
+            continue
+        m = re.match(r"^([-*+]|\d+[.)])\s+(.*)$", st)
+        if m:
+            tag = "ol" if m[1][0].isdigit() else "ul"
+            if para:
+                flush()
+            if lst and lst[0] != tag:
+                flush()
+            lst = lst or (tag, [])
+            lst[1].append(m[2])
+            continue
+        if st.startswith(">"):
+            flush()
+            outp.append(f"<blockquote><p>{_inline(st.lstrip('> '))}</p></blockquote>")
+            continue
+        if re.match(r"^(-{3,}|\*{3,})$", st):
+            flush()
+            outp.append("<hr />")
+            continue
+        if lst:
+            flush()
+        para.append(st)
+    flush()
+    return "\n".join(outp)
+
+
+def read_content(path):
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    if p.suffix.lower() in (".html", ".htm"):
+        return text, None
+    title = None
+    m = re.match(r"^\s*#\s+(.+)\n", text)
+    if m:  # dong "# Tieu de" dau file la tieu de bai, khong dua vao noi dung
+        title, text = m[1].strip(), text[m.end():]
+    return md_to_html(text), title
+
+
+def safe_name(name):
+    stem, ext = os.path.splitext(name)
+    stem = unicodedata.normalize("NFKD", stem.replace("đ", "d").replace("Đ", "D")).encode("ascii", "ignore").decode()
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "-", stem).strip("-")[:60] or "anh"
+    return stem + ext.lower()
+
+
+# ------------------------------------------------------------------ noi dang (alias cua skill -> site / OA trong Lich dang)
 
 def skill_sites():
+    """alias -> {"url": ...} (site WordPress) hoac {"oa_id": ...} (Zalo OA), tu settings.json cua skill."""
     f = SKILL / "settings.json"
     if not f.is_file():
         return {}, None
     cfg = json.loads(f.read_text(encoding="utf-8"))
-    return cfg.get("sites", {}), cfg.get("default_site")
+    return {**cfg.get("sites", {}), **cfg.get("oas", {})}, cfg.get("default_site") or cfg.get("default_oa")
 
 
 def lich_site(wanted):
@@ -119,21 +209,27 @@ def lich_site(wanted):
     me = call("GET", "/me")
     sites = me["sites"]
     if not sites:
-        die("Lich dang chua co site WordPress nao. Nho nguoi dung vao Open WebUI > Lich dang > Cai dat > "
-            "Ket noi WordPress de them site (agent khong tu them duoc).")
+        die("Lich dang chua co noi dang nao. Nho nguoi dung vao Open WebUI > Lich dang > Cai dat > Ket noi de them "
+            "site WordPress hoac Zalo OA (agent khong tu them duoc).")
+    aliases, default_alias = skill_sites()
+    wanted = wanted or default_alias
     if not wanted:
         default = me["settings"].get("default_site_id")
         return next((s for s in sites if s["id"] == default), sites[0]), me
-    aliases, _ = skill_sites()
-    url = (aliases.get(wanted) or {}).get("url", "").rstrip("/")
+    entry = aliases.get(wanted) or {}
+    url = entry.get("url", "").rstrip("/")
+    oa_id = str(entry.get("oa_id") or "")
     for s in sites:
-        if wanted in (s["id"], s["name"]) or (url and s["url"].rstrip("/") == url) or s["url"].rstrip("/") == wanted.rstrip("/"):
+        if (wanted in (s["id"], s["name"]) or (url and s["url"].rstrip("/") == url)
+                or (oa_id and s.get("oa_id") == oa_id) or s["url"].rstrip("/") == wanted.rstrip("/")):
             return s, me
     die(f"Khong thay site '{wanted}' trong Lich dang.", sites=[{"name": s["name"], "url": s["url"]} for s in sites])
 
 
 def site_view(s):
-    return {"name": s["name"], "url": s["url"], "ket_noi": "ok" if s["check_ok"] else (s["check_error"] or "chua kiem tra")}
+    where = f"Zalo OA {s.get('oa_id')}" if s.get("kind") == "zalo_oa" else s["url"]
+    return {"name": s["name"], "kenh": s.get("kind_label", "WordPress"), "dia_chi": where,
+            "ket_noi": "ok" if s["check_ok"] else (s["check_error"] or "chua kiem tra")}
 
 
 # ------------------------------------------------------------------ HTML -> Markdown (xem truoc trong chat)
@@ -223,10 +319,39 @@ def html_to_md(text):
     return re.sub(r"\n{3,}", "\n\n", md).strip()
 
 
+def zalo_preview_md(post, me, site, when):
+    """Bai Zalo nhu tren ung dung: chu thuong tung doan, anh rieng dong (Zalo bo chu dam, link)."""
+    blocks = call("GET", f"/posts/{post['id']}/zalo")["blocks"]
+    author = ((site or {}).get("options") or {}).get("author") or (site or {}).get("name", "")
+    rows = [
+        ("Zalo OA", site["name"] if site else "chưa chọn"),
+        ("Giờ đăng", when),
+        ("Chế độ", post["mode_label"]),
+        ("Trạng thái", post["state_label"]),
+        ("Tác giả", author),
+        ("Mô tả ngắn", f"{post['excerpt'] or '—'} ({len(post['excerpt'] or '')}/300 ký tự)"),
+        ("Tiêu đề", f"{len(post['title'])}/150 ký tự"),
+    ]
+    head = "\n".join(f"| {k} | {str(v).replace('|', '/')} |" for k, v in rows)
+    cover = f"![Ảnh bìa](/api/v1/cqf/lich/posts/{post['id']}/cover)\n\n" if post["has_cover"] else "**Chưa có ảnh bìa (Zalo bắt buộc).**\n\n"
+    body = []
+    for b in blocks:
+        if b["type"] == "image":
+            body.append(f"![{b.get('caption', '')}]({b['url']})")
+        else:
+            body.append(html.unescape(b["content"]).replace("*", "\\*"))
+    return (f"**Xem trước bài Zalo OA · {post['title']}**\n\n| | |\n|---|---|\n{head}\n\n{cover}"
+            f"### {post['title']}\n\n" + "\n\n".join(body) + "\n\n---\n"
+            f"Trên Zalo bài chỉ có chữ thường và ảnh. [Mở trong Lịch đăng](/#lich-dang/post={post['id']}) để xem như trên "
+            f"Zalo, đổi giờ, đổi chế độ, huỷ lịch · múi giờ {me['settings']['timezone']}")
+
+
 def preview_md(post, me):
     tz = me["settings"]["timezone"]
     site = next((s for s in me["sites"] if s["id"] == post["site_id"]), None)
     when = post.get("publish_at_label") or ("chưa có giờ đăng" if not post["publish_at"] else post["publish_at"])
+    if post.get("channel") == "zalo_oa":
+        return zalo_preview_md(post, me, site, when)
     rows = [
         ("Site", f"{site['name']} ({site['url']})" if site else "chưa chọn"),
         ("Giờ đăng", when),
@@ -369,7 +494,11 @@ def cmd_schedule(a):
         body["mode"] = a.mode
     me = call("GET", "/me")
     post = with_label(call("POST", f"/posts/{a.id}/schedule", body=body), me)
-    verb = "tự đăng lên site" if post["mode"] == "publish" else "vào WordPress dạng nháp (bạn tự bấm Đăng trong WordPress)"
+    if post.get("channel") == "zalo_oa":
+        verb = ("hiện trên Zalo OA (không gửi cho người quan tâm)" if post["mode"] == "publish"
+                else "được tạo ẩn trên Zalo OA (chủ OA tự bật hiển thị)")
+    else:
+        verb = "tự đăng lên site" if post["mode"] == "publish" else "vào WordPress dạng nháp (bạn tự bấm Đăng trong WordPress)"
     out({"ok": True, "post": brief(post),
          "bao_nguoi_dung": f"Đã hẹn: {post['publish_at_label']}, bài sẽ {verb}. Đổi giờ hay huỷ: "
                            f"[mở trong Lịch đăng](/#lich-dang/post={post['id']})"})
@@ -415,11 +544,12 @@ def main():
     p.add_argument("--id", help="sua bai da co")
     p.add_argument("--title")
     p.add_argument("--slug")
-    p.add_argument("--excerpt")
+    p.add_argument("--excerpt", "--description", dest="excerpt", help="mo ta ngan (Zalo OA: toi da 300 ky tu)")
     p.add_argument("--categories", nargs="*")
     p.add_argument("--tags", nargs="*")
     p.add_argument("--featured", help="anh dai dien: file hoac URL")
-    p.add_argument("--mode", choices=["publish", "draft"], help="publish = Dang that, draft = Luu nhap tren WordPress")
+    p.add_argument("--mode", choices=["publish", "draft"],
+                   help="publish = Dang that / Hien ngay tren Zalo OA, draft = Luu nhap tren WordPress / Tao bai an tren Zalo OA")
     p.set_defaults(f=cmd_save)
     p = sp.add_parser("media", help="Tai 1 anh vao bai, tra url de chen")
     p.add_argument("id")
