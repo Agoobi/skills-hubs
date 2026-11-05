@@ -1,13 +1,13 @@
 ---
 name: viet-bai-zalo-oa
-description: Viết bài Zalo OA, tạo bài ẩn để chủ OA duyệt và hiện.
-version: 0.1.0
+description: Viết bài Zalo OA, xem trước trong chat, lên lịch hiện bài hoặc tạo bài ẩn qua Lịch đăng của Open WebUI.
+version: 0.2.0
 author: Agoobi
 license: MIT
 metadata:
   hermes:
     category: coquifly
-    tags: [zalo, zalo-oa, bai-viet, vietnamese]
+    tags: [zalo, zalo-oa, bai-viet, vietnamese, lich-dang]
 required_environment_variables:
   - name: ZALO_APP_ID
     prompt: App ID của app Zalo (developers.zalo.me) đã liên kết với OA
@@ -21,15 +21,28 @@ required_environment_variables:
 
 # viet-bai-zalo-oa
 
-Viết bài (article) cho **Zalo Official Account** theo các "cổng" (gate) để user duyệt từng bước, hỗ trợ **nhiều OA**, rồi tạo bài qua Zalo OA API ở trạng thái **ẨN** và gửi link để chủ OA tự kiểm tra, bật hiển thị hoặc gửi broadcast.
+Viết bài (article) cho **Zalo Official Account** theo các "cổng" (gate) để user duyệt từng bước, **xem trước ngay
+trong chat**, rồi **lên lịch** trong **Lịch đăng** của Open WebUI (sidebar → Lịch đăng). Đúng giờ máy chủ tạo bài trên
+OA: **Hiện ngay** hoặc **Tạo bài ẩn** (chủ OA tự bật hiển thị). User xem lịch, kéo đổi giờ, đổi chế độ, huỷ lịch trên
+trang đó.
+
+Lịch đăng là phần của [openwebui-custom](https://github.com/Agoobi/openwebui-custom), dùng chung token OA với kênh
+Zalo của chatbot. Máy chưa có Lịch đăng, hoặc OA chưa được thêm vào Lịch đăng (`lich.py status` không có OA): dùng
+cách cũ ở cuối file (tạo bài ẩn ngay).
 
 ## Quy tắc sắt
 
-1. **Agent KHÔNG hiện bài, KHÔNG gửi broadcast, KHÔNG xóa bài.** Script luôn gửi `status: hide`, không có lệnh đăng/xóa.
-2. Mỗi Gate phải **dừng và chờ user trả lời**. Không gộp gate, không đoán thông tin thiếu.
-3. Không bịa số liệu, giá, khuyến mãi, thời hạn, đánh giá khách hàng.
-4. Không in App Secret, access token, refresh token ra chat. Không commit `settings.json`.
-5. Không sửa bài đang hiển thị (script từ chối).
+1. **Agent KHÔNG gửi broadcast** (bài cho người quan tâm) và **không xóa bài**. Chủ OA tự gửi trên oa.zalo.me.
+2. **Không hiện bài khi user chưa đồng ý.** Chỉ hẹn giờ khi user đã xem preview và đồng ý giờ + chế độ trong chat
+   (`schedule ... --i-have-user-approval`). "Hiện ngay" chỉ khi user chọn; không chắc thì dùng "Tạo bài ẩn"
+   (`--mode draft`). Giờ hẹn phải sau lúc này ít nhất 2 phút.
+3. Mỗi Gate phải **dừng và chờ user trả lời**. Không gộp gate, không đoán thông tin thiếu.
+4. Không bịa số liệu, giá, khuyến mãi, thời hạn, đánh giá khách hàng.
+5. Không in App Secret, access token, refresh token ra chat. Không commit `settings.json`.
+6. Agent không thêm OA vào Lịch đăng, không đổi múi giờ, khung giờ, tác giả, bình luận: đó là việc của user trong
+   Lịch đăng → Cài đặt → Kết nối.
+7. **Xem trước = dán nguyên văn `preview_markdown`** vào câu trả lời (bảng thông tin, ảnh bìa, toàn văn, link Lịch
+   đăng). Không tóm tắt, không viết lại.
 
 ## Cài đặt (một lần)
 
@@ -47,7 +60,10 @@ Mọi lệnh chạy bằng `python -I scripts/zalooa.py <lệnh>` từ thư mụ
 
 ## Quy trình (các Gate)
 
-Bắt đầu: `oas`. OA nào `ket_noi: CHUA` → làm phần Cài đặt rồi dừng.
+Bắt đầu: `python -I scripts/lich.py status` (nơi đăng, khung giờ, múi giờ). OA cần dùng chưa có trong Lịch đăng →
+nhắc user vào Lịch đăng → Cài đặt → Kết nối → Zalo OA → "Thêm vào Lịch đăng" (OA phải kết nối ở trang Chatbot → Kênh
+Zalo OA trước); muốn làm ngay thì dùng cách cũ. Không có Lịch đăng: `oas`, OA nào `ket_noi: CHUA` → làm phần Cài đặt
+rồi dừng.
 
 **Gate 1 — Chọn OA.** Liệt kê OA (label + alias). Chỉ 1 OA thì xác nhận nhanh.
 
@@ -63,7 +79,33 @@ Mỗi ảnh **≤ 1 MB** (lớn hơn: Zalo nhận lệnh nhưng lỗi khi xử l
 
 **Gate 4 — Bản nháp.** Viết **1-2 phương án** theo `references/viet-bai.md` và cấu hình OA (`brand_voice`, `audience`, `default_cta`, `avoid`, `length`); mỗi phương án kèm mô tả ngắn (≤ 300 ký tự, hiện ở danh sách bài và khi chia sẻ). Bài tạo qua API **chỉ có chữ thô**: không đậm, nghiêng, link bấm được; nhấn mạnh bằng cách tách đoạn, emoji, tiêu đề mục. Hiển thị nguyên văn, hỏi: chọn phương án nào? sửa gì? Lặp đến khi user nói "ok", rồi lưu bản chốt vào `drafts/<ten>.md` (dòng đầu `# Tiêu đề`, tối đa 150 ký tự).
 
-**Gate 5 — Duyệt cuối.** Chạy `validate` (cùng tham số với `draft`; không gửi gì lên Zalo): kiểm độ dài, tải thử từng ảnh (có phải ảnh, ≤ 1 MB, có chuyển hướng không) và in `preview` đúng như bài sẽ hiện. Có `errors` → sửa rồi chạy lại; có `warnings` → báo user. Gửi user preview kèm: OA, tiêu đề, mô tả, tác giả, ảnh bìa, bình luận bật/tắt, trạng thái **ẨN**. Hỏi: "Tạo bài (ẩn) trên Zalo OA nhé?" Chỉ chạy `draft` khi user đồng ý.
+**Gate 5 — Xem trước trong chat.** Đưa bài vào Lịch đăng (chưa hẹn giờ):
+
+```
+python -I scripts/lich.py save --site <alias OA> --content-file drafts/<ten>.md --featured <file|URL https> \
+  --description "<mô tả ngắn ≤ 300 ký tự>"
+```
+
+Ảnh bìa và ảnh trong bài (file trên máy hoặc URL) được tải vào Lịch đăng; ảnh lớn hơn 1 MB được thu nhỏ khi gửi, không
+cần `image_host`. **Dán nguyên `preview_markdown`** (đúng như bài sẽ hiện trên Zalo: chữ thường từng đoạn, ảnh riêng
+dòng). Sửa: sửa file, chạy lại `save --id <id> ...` (sửa tại chỗ), dán preview mới. Lặp đến khi user nói "ok".
+
+**Gate 6 — Chọn giờ và duyệt cuối.** Lấy giờ trống: `lich.py slots`. Hỏi trong 1 lượt: "Lên lúc nào? (gợi ý:
+<2-3 giờ trống>) · Hiện ngay hay tạo bài ẩn để bạn tự bật?". Tóm tắt: OA, tiêu đề, giờ (thứ, ngày, múi giờ), chế độ.
+Nhắc: Lịch đăng không gửi bài cho người quan tâm. Chỉ khi user đồng ý rõ:
+
+```
+python -I scripts/lich.py schedule <id> --time "YYYY-MM-DD HH:MM" --mode publish|draft --i-have-user-approval
+python -I scripts/lich.py schedule <id> --next --mode draft --i-have-user-approval     # khung giờ trống kế tiếp
+```
+
+`publish` = Hiện ngay trên Zalo OA, `draft` = Tạo bài ẩn. Báo lại câu `bao_nguoi_dung` mà script trả về. Sau đó:
+`lich.py get <id>` (trạng thái, lỗi), `unschedule <id>` (huỷ, bài về Chưa lên lịch), `mode <id> --mode ...`.
+Lịch đăng tự kiểm: tiêu đề ≤ 150 ký tự, mô tả ≤ 300, phải có ảnh bìa; thiếu thì từ chối hẹn kèm lý do.
+
+## Cách cũ: tạo bài ẩn ngay (máy chưa có Lịch đăng)
+
+**Duyệt cuối.** Chạy `validate` (cùng tham số với `draft`; không gửi gì lên Zalo): kiểm độ dài, tải thử từng ảnh (có phải ảnh, ≤ 1 MB, có chuyển hướng không) và in `preview` đúng như bài sẽ hiện. Có `errors` → sửa rồi chạy lại; có `warnings` → báo user. Gửi user preview kèm: OA, tiêu đề, mô tả, tác giả, ảnh bìa, bình luận bật/tắt, trạng thái **ẨN**. Hỏi: "Tạo bài (ẩn) trên Zalo OA nhé?" Chỉ chạy `draft` khi user đồng ý.
 
 **Bàn giao.**
 
