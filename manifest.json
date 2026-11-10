@@ -113,6 +113,19 @@
       "agents": ["hermes"],
       "requires": { "toolsets": ["terminal"], "env": [] },
       "featured": false
+    },
+    {
+      "id": "setup-hermes-vps",
+      "path": "skills/setup-hermes-vps",
+      "name": "Bot Setup Hermes cho khách",
+      "summary": "Một lệnh cài Hermes lên VPS khách: SSH key, model OpenRouter, bot Telegram 24/7, Zernio, skill quảng cáo",
+      "category": "operations",
+      "icon": "server",
+      "tags": ["hermes", "vps", "setup", "telegram", "openrouter", "zernio", "onboarding"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal"], "env": [] },
+      "featured": false
     }
   ]
 }
