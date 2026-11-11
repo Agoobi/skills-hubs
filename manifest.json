@@ -118,7 +118,7 @@
       "id": "setup-hermes-vps",
       "path": "skills/setup-hermes-vps",
       "name": "Bot Setup Hermes cho khách",
-      "summary": "Một lệnh cài Hermes lên VPS khách: SSH key, model OpenRouter, bot Telegram 24/7 (chỉ 1 tin kết quả), Zernio, skill quảng cáo, Open WebUI có HTTPS",
+      "summary": "Một lệnh cài Hermes lên VPS khách: Telegram 24/7 gọn tin, Zernio, skill quảng cáo, Open WebUI HTTPS",
       "category": "operations",
       "icon": "server",
       "tags": ["hermes", "vps", "setup", "telegram", "openrouter", "zernio", "onboarding", "open-webui"],
