@@ -21,6 +21,8 @@ VPS_USER="${VPS_USER:-root}"; VPS_PORT="${VPS_PORT:-22}"
 CHAT_MODEL="${CHAT_MODEL:-deepseek/deepseek-v4.1-flash}"
 IMAGE_MODEL="${IMAGE_MODEL:-google/gemini-3.1-flash-lite-image}"
 SKILLS="${SKILLS:-chay-quang-cao-facebook}"
+OPENWEBUI="${OPENWEBUI:-1}"          # 1 = cai Open WebUI (HTTPS qua sslip.io); 0 = bo qua
+TELEGRAM_QUIET="${TELEGRAM_QUIET:-1}" # 1 = bot Telegram chi gui 1 tin ket qua, khong nhan tung buoc
 for v in VPS_HOST OPENROUTER_API_KEY TELEGRAM_BOT_TOKEN; do
   [ -n "${!v:-}" ] || die "$v dang trong trong $ENV_FILE"
 done
@@ -54,9 +56,18 @@ if ssh "${SSH_OPTS[@]}" -o BatchMode=yes "$TARGET" true 2>/dev/null; then
   echo "  Da vao duoc bang key"
 else
   [ -n "${VPS_PASSWORD:-}" ] || die "chua vao duoc bang key va VPS_PASSWORD trong"
-  command -v sshpass >/dev/null || die "can sshpass (sudo apt install sshpass)"
-  SSHPASS="$VPS_PASSWORD" sshpass -e ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "${SSH_OPTS[@]}" "$TARGET" >/dev/null 2>&1 \
-    || die "ssh-copy-id that bai (sai mat khau hoac VPS chan dang nhap mat khau)"
+  # Uu tien paramiko (on dinh tren moi he, nhat la Windows/Git Bash); khong co thi dung sshpass.
+  PY_SSH=""
+  for c in py python3 python; do
+    command -v "$c" >/dev/null && "$c" -c 'import paramiko' 2>/dev/null && { PY_SSH="$c"; break; }
+  done
+  if [ -n "$PY_SSH" ]; then
+    "$PY_SSH" "$HERE/install-key.py" "$ENV_FILE" >/dev/null || die "cai key bang paramiko that bai (sai mat khau, VPS chan dang nhap mat khau, hoac sai port)"
+  elif command -v sshpass >/dev/null; then
+    SSHPASS="$VPS_PASSWORD" sshpass -e ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "${SSH_OPTS[@]}" "$TARGET" >/dev/null 2>&1       || die "ssh-copy-id that bai (sai mat khau, VPS chan dang nhap mat khau, hoac sshpass loi tren Windows -> cai paramiko: py -m pip install paramiko)"
+  else
+    die "can paramiko (py -m pip install paramiko) hoac sshpass (sudo apt install sshpass) de cai key bang mat khau"
+  fi
   ssh "${SSH_OPTS[@]}" -o BatchMode=yes "$TARGET" true || die "da chep key nhung van khong vao duoc bang key"
   echo "  Da cai key, tu gio vao khong can mat khau"
 fi
@@ -73,9 +84,15 @@ q() { printf '%q' "$1"; }
   echo "export ALLOWED_IDS=$(q "$ALLOWED_IDS")"
   echo "export HOME_CHANNEL=$(q "${ALLOWED_IDS%%,*}")"
   echo "export CHAT_MODEL=$(q "$CHAT_MODEL") IMAGE_MODEL=$(q "$IMAGE_MODEL") SKILLS=$(q "$SKILLS")"
+  echo "export TELEGRAM_QUIET=$(q "$TELEGRAM_QUIET") VPS_HOST=$(q "$VPS_HOST") OPENWEBUI_DOMAIN=$(q "${OPENWEBUI_DOMAIN:-}")"
   cat "$HERE/remote.sh"
-} | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
+  [ "$OPENWEBUI" = "1" ] && { echo; cat "$HERE/openwebui.sh"; }
+} | tr -d '\r' | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
 
 echo
 echo "XONG. Bot: @$BOT_USERNAME | VPS: $VPS_HOST | ID duoc dung: $ALLOWED_IDS"
 echo "Nhan khach mo t.me/$BOT_USERNAME va bam Start."
+if [ "$OPENWEBUI" = "1" ]; then
+  OW_DOMAIN="${OPENWEBUI_DOMAIN:-$(echo "$VPS_HOST" | tr . -).sslip.io}"
+  echo "Open WebUI: https://$OW_DOMAIN (tai khoan admin: ssh $TARGET 'cat ~/.hermes/openwebui.env')"
+fi
