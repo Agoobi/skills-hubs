@@ -40,6 +40,18 @@ hermes config set image_gen.provider openrouter >/dev/null
 hermes config set image_gen.model "$IMAGE_MODEL" >/dev/null
 echo "  Model chat: $CHAT_MODEL | Model anh: $IMAGE_MODEL"
 
+# --- Telegram yen lang: khong nhan tung buoc/suy nghi, chi 1 tin ket qua ---
+# Mac dinh Hermes gui "tin giua chung" + nhat ky tool nen khach thay bot nhan lien tuc khi dang think.
+if [ "${TELEGRAM_QUIET:-1}" = "1" ]; then
+  for kv in tool_progress=off interim_assistant_messages=false show_reasoning=false busy_ack_detail=false \
+            suppress_warning_notifications=true cleanup_progress=true long_running_notifications=true; do
+    hermes config set "display.platforms.telegram.${kv%%=*}" "${kv#*=}" >/dev/null
+  done
+  SOUL="$HOME/.hermes/SOUL.md"; touch "$SOUL"
+  grep -q "MOC-IM-LANG" "$SOUL" || printf '\n\n<!-- MOC-IM-LANG -->\nTrên Telegram: làm xong rồi mới nhắn một lần. Không nhắn từng bước, không kể quá trình suy nghĩ, không báo "đang làm". Việc dài thì cứ làm, hệ thống tự hiện trạng thái chờ.\n' >>"$SOUL"
+  echo "  Telegram: che do yen lang (1 tin ket qua, tien do gom 1 bong bong tu xoa)"
+fi
+
 # --- Skill tu hub ---
 HUB="$HOME/.hermes/skills-hub-src"
 if [ -d "$HUB/.git" ]; then git -C "$HUB" pull -q --ff-only; else git clone -q --depth 1 "$HUB_URL" "$HUB"; fi

@@ -21,6 +21,8 @@ VPS_USER="${VPS_USER:-root}"; VPS_PORT="${VPS_PORT:-22}"
 CHAT_MODEL="${CHAT_MODEL:-deepseek/deepseek-v4.1-flash}"
 IMAGE_MODEL="${IMAGE_MODEL:-google/gemini-3.1-flash-lite-image}"
 SKILLS="${SKILLS:-chay-quang-cao-facebook}"
+OPENWEBUI="${OPENWEBUI:-1}"          # 1 = cai Open WebUI (HTTPS qua sslip.io); 0 = bo qua
+TELEGRAM_QUIET="${TELEGRAM_QUIET:-1}" # 1 = bot Telegram chi gui 1 tin ket qua, khong nhan tung buoc
 for v in VPS_HOST OPENROUTER_API_KEY TELEGRAM_BOT_TOKEN; do
   [ -n "${!v:-}" ] || die "$v dang trong trong $ENV_FILE"
 done
@@ -73,9 +75,15 @@ q() { printf '%q' "$1"; }
   echo "export ALLOWED_IDS=$(q "$ALLOWED_IDS")"
   echo "export HOME_CHANNEL=$(q "${ALLOWED_IDS%%,*}")"
   echo "export CHAT_MODEL=$(q "$CHAT_MODEL") IMAGE_MODEL=$(q "$IMAGE_MODEL") SKILLS=$(q "$SKILLS")"
+  echo "export TELEGRAM_QUIET=$(q "$TELEGRAM_QUIET") VPS_HOST=$(q "$VPS_HOST") OPENWEBUI_DOMAIN=$(q "${OPENWEBUI_DOMAIN:-}")"
   cat "$HERE/remote.sh"
-} | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
+  [ "$OPENWEBUI" = "1" ] && { echo; cat "$HERE/openwebui.sh"; }
+} | tr -d '\r' | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
 
 echo
 echo "XONG. Bot: @$BOT_USERNAME | VPS: $VPS_HOST | ID duoc dung: $ALLOWED_IDS"
 echo "Nhan khach mo t.me/$BOT_USERNAME va bam Start."
+if [ "$OPENWEBUI" = "1" ]; then
+  OW_DOMAIN="${OPENWEBUI_DOMAIN:-$(echo "$VPS_HOST" | tr . -).sslip.io}"
+  echo "Open WebUI: https://$OW_DOMAIN (tai khoan admin: ssh $TARGET 'cat ~/.hermes/openwebui.env')"
+fi
