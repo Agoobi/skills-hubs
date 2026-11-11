@@ -44,9 +44,9 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 
 ## Cách chạy
 
-Chạy từ thư mục skill này, trên máy của người vận hành (cần `ssh`, `curl`, `python3`; lần đầu với mật khẩu cần `sshpass`).
+Chạy từ thư mục skill này, trên máy của người vận hành (cần `ssh`, `curl`, `python3`; lần đầu với mật khẩu cần **paramiko** (`pip install paramiko`, khuyên dùng) hoặc `sshpass`).
 
-**Windows (Git Bash):** `sshpass` hay báo `ssh-copy-id that bai` dù mật khẩu đúng. Cài key bằng paramiko (`py -m pip install paramiko`) rồi chạy lại, script sẽ thấy "Da vao duoc bang key":
+**Cài SSH key bằng mật khẩu — dùng paramiko:** `setup.sh` tự dùng paramiko (`scripts/install-key.py`) nếu máy có, không thì mới tới `sshpass`. Trên **Windows/Git Bash** `sshpass` hay báo `ssh-copy-id that bai` dù mật khẩu đúng, nên cài paramiko trước: `py -m pip install paramiko`. Muốn tự cài key riêng (rồi chạy lại, script sẽ thấy "Da vao duoc bang key"):
 ```
 py scripts/install-key.py ~/khach/<ten-khach>.env
 ```
@@ -78,7 +78,7 @@ Mật khẩu có ký tự `#`, `!`: đặt trong dấu nháy đơn trong file en
 
 ## Script làm gì (để giải thích khi được hỏi)
 
-`scripts/setup.sh` (máy vận hành): kiểm key OpenRouter + hạn mức, `getMe` Telegram, model có trên OpenRouter → cài SSH key bằng `sshpass` → đẩy `scripts/remote.sh` kèm biến bí mật qua stdin ssh.
+`scripts/setup.sh` (máy vận hành): kiểm key OpenRouter + hạn mức, `getMe` Telegram, model có trên OpenRouter → cài SSH key (paramiko, dự phòng `sshpass`) → đẩy `scripts/remote.sh` kèm biến bí mật qua stdin ssh.
 
 `scripts/remote.sh` (trên VPS): cài Hermes bằng installer chính thức (`--skip-setup`) → ghi `~/.hermes/.env` (OpenRouter, Telegram token, `TELEGRAM_ALLOWED_USERS`, `TELEGRAM_HOME_CHANNEL`, Zernio) → `hermes config set` model chat + `image_gen` OpenRouter → clone hub, chép skill vào `~/.hermes/skills/<category>/<id>` → skill quảng cáo: `execution: zernio`, `check`, `accounts --write`, đặt tài khoản mặc định nếu chỉ có một → dừng gateway tạm do `hermes chat` sinh ra, `hermes gateway install` (systemd user + linger), chờ log `telegram connected`.
 

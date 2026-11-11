@@ -56,9 +56,18 @@ if ssh "${SSH_OPTS[@]}" -o BatchMode=yes "$TARGET" true 2>/dev/null; then
   echo "  Da vao duoc bang key"
 else
   [ -n "${VPS_PASSWORD:-}" ] || die "chua vao duoc bang key va VPS_PASSWORD trong"
-  command -v sshpass >/dev/null || die "can sshpass (sudo apt install sshpass)"
-  SSHPASS="$VPS_PASSWORD" sshpass -e ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "${SSH_OPTS[@]}" "$TARGET" >/dev/null 2>&1 \
-    || die "ssh-copy-id that bai (sai mat khau hoac VPS chan dang nhap mat khau)"
+  # Uu tien paramiko (on dinh tren moi he, nhat la Windows/Git Bash); khong co thi dung sshpass.
+  PY_SSH=""
+  for c in py python3 python; do
+    command -v "$c" >/dev/null && "$c" -c 'import paramiko' 2>/dev/null && { PY_SSH="$c"; break; }
+  done
+  if [ -n "$PY_SSH" ]; then
+    "$PY_SSH" "$HERE/install-key.py" "$ENV_FILE" >/dev/null || die "cai key bang paramiko that bai (sai mat khau, VPS chan dang nhap mat khau, hoac sai port)"
+  elif command -v sshpass >/dev/null; then
+    SSHPASS="$VPS_PASSWORD" sshpass -e ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "${SSH_OPTS[@]}" "$TARGET" >/dev/null 2>&1       || die "ssh-copy-id that bai (sai mat khau, VPS chan dang nhap mat khau, hoac sshpass loi tren Windows -> cai paramiko: py -m pip install paramiko)"
+  else
+    die "can paramiko (py -m pip install paramiko) hoac sshpass (sudo apt install sshpass) de cai key bang mat khau"
+  fi
   ssh "${SSH_OPTS[@]}" -o BatchMode=yes "$TARGET" true || die "da chep key nhung van khong vao duoc bang key"
   echo "  Da cai key, tu gio vao khong can mat khau"
 fi

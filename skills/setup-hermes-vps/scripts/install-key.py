@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Cai SSH key cua may nay len VPS bang paramiko (thay sshpass khi chay tren Windows).
 Dung: py scripts/install-key.py <khach.env>
 Doc VPS_HOST/VPS_USER/VPS_PORT/VPS_PASSWORD tu file env; khong in mat khau."""
