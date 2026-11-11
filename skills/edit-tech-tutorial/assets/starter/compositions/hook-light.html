@@ -1,0 +1,28 @@
+<template>
+<style>
+@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-Medium.ttf');font-weight:500}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-SemiBold.ttf');font-weight:600}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-ExtraBold.ttf');font-weight:800}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-Black.ttf');font-weight:900}
+#root{position:relative;width:1080px;height:1920px;overflow:hidden;background:#F7F7F4;font-family:BVP,sans-serif;color:#202020}
+#grid{position:absolute;inset:0;background-image:linear-gradient(#20202010 1px,transparent 1px),linear-gradient(90deg,#20202010 1px,transparent 1px);background-size:60px 60px}
+#arc{position:absolute;right:-220px;top:180px;width:620px;height:620px;border:2px solid #20202018;border-radius:50%}
+#kicker{position:absolute;left:90px;top:560px;font-size:44px;font-weight:600;color:#5a5a5a}
+#key{position:absolute;left:90px;top:630px;font-size:150px;line-height:1.08;font-weight:900;font-style:italic;color:#CF5F38;letter-spacing:-3px;text-shadow:0 6px 18px #CF5F3833}
+#sub{position:absolute;left:90px;top:1000px;width:820px;font-size:52px;line-height:1.3;font-weight:600}
+#card{position:absolute;left:90px;top:1180px;width:900px;background:#fff;border-radius:28px;box-shadow:0 18px 40px #0000001f;padding:40px;box-sizing:border-box;font-size:40px;font-weight:600}
+#card b{color:#CF5F38}
+</style>
+<div id="root" data-composition-id="hook" data-start="0" data-duration="4" data-width="1080" data-height="1920">
+  <div id="grid"></div><div id="arc" data-layout-allow-overflow></div>
+  <div id="kicker">Chỉ với 1 câu lệnh</div>
+  <div id="key">Tạo Skill</div>
+  <div id="sub">cho Claude làm việc lặp lại thay bạn</div>
+  <div id="card">Bước 1 → <b>mô tả việc</b> → Claude viết skill</div>
+</div>
+<script>const tl=gsap.timeline({paused:true});
+// khung 0 đã có tiêu đề (thumbnail): kicker + key hiện sẵn, chỉ nảy nhẹ
+tl.fromTo('#key',{scale:.96,transformOrigin:'0% 60%'},{scale:1,duration:.5,ease:'back.out(2)'},0);
+tl.fromTo('#sub',{y:40,opacity:0},{y:0,opacity:1,duration:.35,ease:'power3.out'},0.75);
+tl.fromTo('#card',{y:60,opacity:0},{y:0,opacity:1,duration:.4,ease:'power3.out'},1.0);
+tl.to('#arc',{rotation:30,duration:4,ease:'none'},0);
+tl.to(['#kicker','#key','#sub','#card'],{y:-40,opacity:0,duration:.25,ease:'power2.in',stagger:.03},3.65);
+window.__timelines=window.__timelines||{};window.__timelines['hook']=tl;</script>
+</template>

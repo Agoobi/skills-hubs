@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-Medium.ttf');font-weight:500}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-SemiBold.ttf');font-weight:600}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-ExtraBold.ttf');font-weight:800}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-Black.ttf');font-weight:900}
+html,body{margin:0;background:#111}canvas{display:block;max-width:100vw;max-height:100vh}
+</style></head><body><canvas id="c"></canvas>
+<script>
+// edit-infographic — cảnh số liệu/so sánh/quy trình dựng từ JSON. Hợp đồng: renderFrame(t), __dur, setData, __cues.
+// Mỗi cảnh: IN (cấu trúc vào trước) → giá trị chốt đúng lúc lời nói (at) → HOLD → OUT.
+const Q = new URLSearchParams(location.search);
+const W = +Q.get('w') || 1080, H = +Q.get('h') || 1920, ALPHA = Q.get('alpha') === '1';
+const c = document.getElementById('c'); c.width = W; c.height = H; const g = c.getContext('2d');
+const S = W / 1080, X = v => v * S;
+
+let D = {
+  scenes: [
+    { type: 'stat', from: 0, to: 3.2, at: 1.2, value: 3, decimals: 0, suffix: ' giờ', label: 'mỗi ngày chủ shop trả lời tin nhắn', source: 'VÍ DỤ — thay bằng số liệu thật có nguồn' },
+    { type: 'bars', from: 3.2, to: 7.4, at: 4.6, title: 'Thời gian phản hồi trung bình', unit: ' phút',
+      items: [ { label: 'Nhân viên', value: 18 }, { label: 'Chatbot AI', value: 0.2, highlight: true, display: '< 1' } ] },
+    { type: 'steps', from: 7.4, to: 12.0, title: 'Agent xử lý một đơn', items: [
+      { text: 'Đọc tin nhắn khách', at: 8.0 }, { text: 'Tra tồn kho & giá', at: 8.9 }, { text: 'Tư vấn đúng sản phẩm', at: 9.8 }, { text: 'Chốt đơn, báo bạn', at: 10.7 } ] },
+    { type: 'compare', from: 12.0, to: 16.0, at: 13.2, left: { title: 'Trước', lines: ['Bỏ sót tin đêm', 'Trả lời chậm', 'Nhân viên quá tải'] },
+      right: { title: 'Sau', lines: ['Trả lời 24/7', 'Dưới 1 phút', 'Bạn chỉ duyệt đơn'] } },
+  ],
+  palette: { bg_top:'#091833', bg_bottom:'#060E22', glow1:'#6030D0', glow2:'#40B090', text:'#F5F7FA', muted:'#9FB0CC',
+             accent:'#3FD6A6', accent2:'#8A6BFF', warn:'#FF6B6B', card:'#0F2144', cardBorder:'#1E3A6B', onAccent:'#06121F' },
+  region: { top: 300, bottom: 1480, left: 80, right: 960 },   // safe zone 9:16
+};
+window.setData = d => { D = { ...D, ...d, palette: { ...D.palette, ...(d.palette||{}) }, region: { ...D.region, ...(d.region||{}) } }; build(); };
+function build() {
+  const sc = D.scenes; window.__dur = D.dur || (sc.length ? Math.max(...sc.map(s => s.to)) : 4);
+  const cues = [];
+  sc.forEach(s => { cues.push({ t: s.from, sfx: 'whoosh', note: s.type + ' vào' });
+    if (s.at != null) cues.push({ t: s.at, sfx: 'hit', note: 'giá trị chốt' });
+    (s.items || []).forEach(i => i.at != null && cues.push({ t: i.at, sfx: 'tick', note: i.text || i.label })); });
+  window.__cues = cues.sort((a, b) => a.t - b.t);
+}
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeInOut = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const backOut = x => { const k = 1.6; x = clamp(x); return 1 + (k + 1) * Math.pow(x - 1, 3) + k * Math.pow(x - 1, 2); };
+function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function fmt(v, dec) { return v.toLocaleString('vi-VN', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+function wrap(text, maxW, font) { g.font = font; const out = []; let line = '';
+  for (const w of String(text).split(' ')) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); return out; }
+function glowText(s, x, y, col, blur) { g.save(); g.shadowColor = col; g.shadowBlur = X(blur); g.fillText(s, x, y); g.shadowBlur = X(blur / 3); g.fillText(s, x, y); g.restore(); g.fillText(s, x, y); }
+
+function background(t) {
+  if (ALPHA) return; const p = D.palette;
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, p.bg_top); gr.addColorStop(1, p.bg_bottom); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  const glow = (x, y, r, col, a) => { const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col + Math.round(a * 255).toString(16).padStart(2, '0')); rg.addColorStop(1, col + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
+  glow(W * (0.85 + 0.03 * Math.sin(t * .4)), H * 0.12, W * 0.8, p.glow1, .35); glow(W * 0.1, H * 0.9, W * 0.7, p.glow2, .18);
+}
+// trạng thái vào/ra của cảnh
+function env(s, t) { const i = easeOut((t - s.from) / 0.45), o = easeInOut((t - (s.to - 0.35)) / 0.35); return { i, o, a: clamp(i) * (1 - o) }; }
+
+const R = () => D.region, CX = () => X((R().left + R().right) / 2), RW = () => X(R().right - R().left);
+function titleH(s) { return s.title ? wrap(s.title, RW(), `800 ${X(52)}px BVP`).length * 66 + 50 : 0; }
+const mid = () => (R().top + R().bottom) / 2;
+function title(s, e, y) { if (!s.title) return y; const p = D.palette;
+  const ls = wrap(s.title, RW(), `800 ${X(52)}px BVP`); g.font = `800 ${X(52)}px BVP`; g.fillStyle = p.text; g.textAlign = 'center'; g.textBaseline = 'middle';
+  ls.forEach((l, k) => g.fillText(l, CX(), X(y) + k * X(66) + (1 - e.i) * X(24))); return y + ls.length * 66 + 50; }
+
+const draw = {
+  stat(s, t, e) { const p = D.palette, k = easeOut((t - (s.at - 0.9)) / 0.9);          // đếm chốt đúng 'at'
+    const v = s.value * k, cy = X((R().top + R().bottom) / 2 - 120);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const sc = 0.85 + 0.15 * backOut((t - s.at + 0.1) / 0.35);
+    g.save(); g.translate(CX(), cy); g.scale(sc, sc); g.font = `900 ${X(s.size || 220)}px BVP`; g.fillStyle = p.accent;
+    glowText((s.prefix || '') + fmt(v, s.decimals || 0) + (s.suffix || ''), 0, 0, p.accent, 40); g.restore();
+    const ls = wrap(s.label, RW() * 0.9, `600 ${X(44)}px BVP`); g.font = `600 ${X(44)}px BVP`; g.fillStyle = p.text;
+    const la = clamp((t - s.from - 0.3) / 0.4); g.globalAlpha *= la;
+    ls.forEach((l, j) => g.fillText(l, CX(), cy + X(190) + j * X(58)));
+    if (s.source) { g.font = `500 ${X(28)}px BVP`; g.fillStyle = p.muted; g.fillText('Nguồn: ' + s.source, CX(), cy + X(210) + ls.length * X(58) + X(30)); }
+  },
+  bars(s, t, e) { const p = D.palette; const n = s.items.length, bhU = Math.min(120, 600 / n);
+    let y = title(s, e, mid() - (titleH(s) + 60 + n * (bhU + 70)) / 2 - 40);
+    const maxV = Math.max(...s.items.map(i => i.value)), bh = X(bhU), gap = X(70);
+    const x0 = X(R().left + 20), wMax = RW() - X(40);
+    s.items.forEach((it, j) => { const by = X(y) + j * (bh + gap) + X(60);
+      const grow = easeOut((t - (s.from + 0.35 + j * 0.12)) / 0.5) * 0.12 + easeOut((t - (s.at - 0.6)) / 0.6) * 0.88;  // khung vào sớm, giá trị chốt tại 'at'
+      g.font = `700 ${X(36)}px BVP`; g.fillStyle = p.text; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(it.label, x0, by - X(12));
+      g.fillStyle = p.card; rr(x0, by, wMax, bh, bh / 2.6); g.fill();
+      const w = Math.max(bh, wMax * (it.value / maxV) * grow);
+      g.fillStyle = it.highlight ? p.accent : p.accent2; rr(x0, by, w, bh, bh / 2.6); g.fill();
+      const lab = (it.display ?? fmt(it.value * clamp(grow), s.decimals || 0)) + (s.unit || '');
+      g.font = `900 ${X(46)}px BVP`; g.textBaseline = 'middle';
+      const tw = g.measureText(lab).width; const inside = w > tw + X(60);
+      g.fillStyle = inside ? p.onAccent : p.text; g.textAlign = inside ? 'right' : 'left';
+      g.globalAlpha *= clamp((t - s.at + 0.2) / 0.3) * 0.999 + 0.001; g.fillText(lab, inside ? x0 + w - X(28) : x0 + w + X(20), by + bh / 2); g.globalAlpha = e.a; });
+  },
+  steps(s, t, e) { const p = D.palette; const n = s.items.length;
+    const step = Math.min(200, (R().bottom - R().top - titleH(s) - 140) / Math.max(1, n - 1));
+    let y = title(s, e, mid() - (titleH(s) + 100 + step * (n - 1)) / 2);
+    const x0 = X(R().left + 70);
+    // đường nối chạy theo bước đang nói
+    const lastAt = s.items.filter(i => t >= i.at).length;
+    g.strokeStyle = p.cardBorder; g.lineWidth = X(6); g.beginPath(); g.moveTo(x0, X(y + 50)); g.lineTo(x0, X(y + 50 + step * (n - 1))); g.stroke();
+    const prog = s.items.reduce((acc, it, j) => acc + (j ? easeOut((t - it.at + 0.25) / 0.35) : 0), 0);
+    g.strokeStyle = p.accent; g.beginPath(); g.moveTo(x0, X(y + 50)); g.lineTo(x0, X(y + 50 + step * prog)); g.stroke();
+    s.items.forEach((it, j) => { const cy = X(y + 50 + j * step), k = backOut((t - it.at) / 0.4), on = t >= it.at;
+      g.fillStyle = on ? p.accent : p.card; g.beginPath(); g.arc(x0, cy, X(38) * (on ? 0.8 + 0.2 * k : 1), 0, 7); g.fill();
+      g.strokeStyle = on ? p.accent : p.cardBorder; g.lineWidth = X(4); g.stroke();
+      g.fillStyle = on ? p.onAccent : p.muted; g.font = `900 ${X(34)}px BVP`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(j + 1), x0, cy + X(1));
+      g.save(); g.globalAlpha *= on ? clamp(k) : 0.28; g.translate((1 - clamp(k)) * X(30), 0);
+      g.textAlign = 'left'; g.font = `800 ${X(44)}px BVP`; g.fillStyle = p.text; g.fillText(it.text, x0 + X(70), cy); g.restore(); });
+  },
+  compare(s, t, e) { const p = D.palette; let y = title(s, e, mid() - (titleH(s) + 20 + (s.height || 640)) / 2);
+    const cw = (RW() - X(30)) / 2, ch = X(s.height || 640), cy = X(y + 20);
+    [['left', 0], ['right', 1]].forEach(([side, j]) => { const d = s[side], cx = X(R().left) + j * (cw + X(30));
+      const k = easeOut((t - s.from - 0.2 - j * 0.15) / 0.5), good = j === 1, win = good && t >= s.at;
+      g.save(); g.globalAlpha *= k; g.translate(0, (1 - k) * X(40));
+      g.fillStyle = p.card; rr(cx, cy, cw, ch, X(36)); g.fill();
+      g.strokeStyle = win ? p.accent : p.cardBorder; g.lineWidth = X(win ? 6 : 3); rr(cx, cy, cw, ch, X(36)); g.stroke();
+      if (win) { g.save(); g.shadowColor = p.accent; g.shadowBlur = X(40) * clamp((t - s.at) / 0.4); rr(cx, cy, cw, ch, X(36)); g.stroke(); g.restore(); }
+      g.fillStyle = good ? p.accent : p.warn; g.font = `900 ${X(54)}px BVP`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(d.title, cx + cw / 2, cy + X(80));
+      d.lines.forEach((l, m) => { const la = good ? clamp((t - s.at - m * 0.18) / 0.3) : clamp((t - s.from - 0.6 - m * 0.18) / 0.3);
+        g.save(); g.globalAlpha *= la; g.font = `700 ${X(36)}px BVP`; g.fillStyle = p.text; g.textAlign = 'left';
+        const ly = cy + X(190 + m * 120); g.fillStyle = good ? p.accent : p.warn; g.fillText(good ? '✓' : '✕', cx + X(30), ly);
+        g.fillStyle = p.text; wrap(l, cw - X(100), `700 ${X(36)}px BVP`).forEach((q, r) => g.fillText(q, cx + X(80), ly + r * X(44))); g.restore(); });
+      g.restore(); });
+  },
+};
+window.renderFrame = t => { g.clearRect(0, 0, W, H); background(t);
+  D.scenes.forEach(s => { if (t < s.from || t >= s.to) return; const e = env(s, t); g.save(); g.globalAlpha = e.a; (draw[s.type] || (() => {}))(s, t, e); g.restore(); }); };
+build();
+window.__ready = Promise.all(['500', '600', '800', '900'].map(w => document.fonts.load(`${w} 40px BVP`))).then(() => { build(); return 1; });
+window.__ready.then(() => { if (Q.get('render') !== '1') { const t0 = performance.now(); (function loop() { renderFrame(((performance.now() - t0) / 1000) % __dur); requestAnimationFrame(loop); })(); } });
+</script></body></html>

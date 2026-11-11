@@ -1,0 +1,49 @@
+<template>
+<style>
+@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-Medium.ttf');font-weight:500}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-SemiBold.ttf');font-weight:600}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-ExtraBold.ttf');font-weight:800}@font-face{font-family:'BVP';src:url('assets/fonts/BeVietnamPro-Black.ttf');font-weight:900}
+#root{position:relative;width:1080px;height:1920px;overflow:hidden;background:#111214;font-family:BVP,sans-serif;color:#FAFAFA}
+#dots{position:absolute;inset:0;background-image:radial-gradient(#ffffff14 1.5px,transparent 1.5px);background-size:36px 36px}
+#label{position:absolute;left:70px;top:290px;font-size:36px;font-weight:800;letter-spacing:2px;color:#9a9a9a}
+/* khung màn hình: giữ tỉ lệ nguồn 16:9, rộng 940 */
+#frame{position:absolute;left:70px;top:380px;width:940px;height:529px;border-radius:22px;overflow:hidden;box-shadow:0 24px 60px #000a;background:#000}
+#cam{position:absolute;left:0;top:0;width:940px;height:529px;transform-origin:0 0}
+#cam video{position:absolute;left:0;top:0;width:940px;height:529px}
+#ring{position:absolute;width:90px;height:90px;margin:-45px 0 0 -45px;border:6px solid #F4F34C;border-radius:50%;opacity:0}
+#cursor{position:absolute;width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-bottom:34px solid #fff;transform:rotate(-30deg);filter:drop-shadow(0 3px 4px #000a)}
+#cap{position:absolute;left:90px;width:900px;top:1020px;font-size:56px;line-height:1.3;font-weight:800;text-shadow:0 3px 8px #00000080}
+#cap .k{color:#F4F34C}
+#cap2{position:absolute;left:90px;width:900px;top:1200px;font-size:40px;line-height:1.35;font-weight:500;color:#cfcfcf}
+#tag{position:absolute;right:70px;top:290px;font-size:28px;font-weight:600;color:#777}
+</style>
+<div id="root" data-composition-id="step" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+  <div id="dots"></div>
+  <div id="label">BƯỚC 1</div><div id="tag">giao diện mẫu</div>
+  <div id="frame"><div id="cam" data-layout-allow-overflow>
+    <video id="screen" class="clip" src="assets/screen.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+    <div id="ring"></div><div id="cursor"></div>
+  </div></div>
+  <div id="cap">Bấm <span class="k">Tạo Skill</span></div>
+  <div id="cap2">Claude đọc mô tả và tự viết hướng dẫn cho việc đó.</div>
+</div>
+<script>
+// Toạ độ trong khung 940×529 (= toạ độ nguồn 1920×1080 × 0.4896). Target = nút "Tạo Skill".
+const S=940/1920, T={x:1670*S,y:300*S}, Z=2.2;
+// camTo: đưa điểm (cx,cy) về giữa khung ở mức zoom z, kẹp để không lộ ngoài mép video
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+const camTo=(z,cx,cy)=>({transformOrigin:'0px 0px',scale:z,x:cl(470-cx*z,940-940*z,0),y:cl(264.5-cy*z,529-529*z,0)});
+const tl=gsap.timeline({paused:true});
+tl.fromTo('#frame',{y:80,opacity:0},{y:0,opacity:1,duration:.4,ease:'power3.out'},0);
+tl.fromTo(['#label','#tag'],{opacity:0},{opacity:1,duration:.3},0.1);
+tl.fromTo('#cursor',{x:300,y:420},{x:T.x+6,y:T.y+10,duration:.9,ease:'power2.inOut'},0.5);
+// đẩy máy tới target rồi giữ (context → target)
+tl.fromTo('#cam',camTo(1,470,264.5),{...camTo(Z,T.x,T.y),duration:.6,ease:'power3.inOut'},1.2);
+// click: vòng sáng tại điểm bấm (đúng frame click, khớp SFX click)
+tl.set('#ring',{left:T.x,top:T.y},0);
+tl.fromTo('#ring',{scale:.4,opacity:1},{scale:1.6,opacity:0,duration:.45,ease:'power2.out',immediateRender:false},2.0);
+tl.fromTo('#cap',{y:30,opacity:0},{y:0,opacity:1,duration:.3,ease:'power3.out'},1.9);
+// lùi máy để thấy phản hồi (response) rồi giữ để đọc
+tl.to('#cam',{...camTo(1.3,1110*S,700*S),duration:.6,ease:'power3.inOut'},3.1);
+tl.fromTo('#cap2',{y:30,opacity:0},{y:0,opacity:1,duration:.3,ease:'power3.out'},3.0);
+tl.to(['#cap','#cap2','#frame'],{opacity:0,y:-30,duration:.25,ease:'power2.in',stagger:.04},6.6);
+window.__timelines=window.__timelines||{};window.__timelines['step']=tl;</script>
+</template>

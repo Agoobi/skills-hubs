@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-ExtraBold.ttf');font-weight:800}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-Black.ttf');font-weight:900}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-SemiBold.ttf');font-weight:600}
+html,body{margin:0;background:#111}canvas{display:block;max-width:100vw;max-height:100vh}
+</style></head><body><canvas id="c"></canvas>
+<script>
+// edit-caption-karaoke — phụ đề nhảy theo từng từ. Hợp đồng: renderFrame(t), __dur, setData(obj).
+const Q = new URLSearchParams(location.search);
+const W = +Q.get('w') || 1080, H = +Q.get('h') || 1920, ALPHA = Q.get('alpha') === '1';
+const c = document.getElementById('c'); c.width = W; c.height = H; const g = c.getContext('2d');
+const S = W / 1080; // tỉ lệ theo khung 1080
+
+// Dữ liệu mặc định (thay bằng setData từ transcript.json + style)
+let D = {
+  words: [
+    {text:'chủ',start:.2,end:.4},{text:'doanh',start:.4,end:.7},{text:'nghiệp',start:.7,end:1.1},
+    {text:'nhỏ',start:1.15,end:1.5},{text:'đang',start:1.8,end:2.0},{text:'mất',start:2.0,end:2.3},
+    {text:'ba',start:2.3,end:2.5},{text:'giờ',start:2.5,end:2.8},{text:'mỗi',start:2.85,end:3.1},{text:'ngày',start:3.1,end:3.6}],
+  style: {
+    preset: 'pop',          // pop | box | underline
+    size: 58,               // px trên khung 1080 (safe-zone: phụ đề 54–60)
+    y: 1380,                // tâm dòng chữ (safe-zone: ≤ 1500)
+    maxWidth: 800,          // ≤ 800 px
+    maxWords: 3,            // số từ tối đa mỗi trang
+    gap: 0.45,              // nghỉ ≥ gap giây thì sang trang mới
+    upper: true,
+    text: '#F5F7FA', accent: '#3FD6A6', boxText: '#06121F', stroke: '#060E22',
+    emphasis: [],           // các từ (chữ thường) muốn tô màu warn, vd ["miễn phí"]
+    warn: '#FF6B6B'
+  },
+  dur: null
+};
+window.setData = (d) => { D = {...D, ...d, style: {...D.style, ...(d.style||{})}}; build(); };
+
+let pages = [];
+function build(){
+  const st = D.style, ws = D.words.filter(w => w.text && w.text.trim());
+  pages = []; let cur = [];
+  ws.forEach((w,i) => {
+    const prev = ws[i-1];
+    const brk = cur.length && (cur.length >= st.maxWords || w.start - prev.end >= st.gap || /[.,!?;:]$/.test(prev.text));
+    if (brk) { pages.push(cur); cur = []; }
+    cur.push(w);
+  });
+  if (cur.length) pages.push(cur);
+  // chia trang quá rộng
+  g.font = `900 ${st.size*S}px BVP`;
+  const out = [];
+  pages.forEach(p => {
+    let line = [];
+    p.forEach(w => { const t = [...line, w]; if (line.length && measure(t) > st.maxWidth*S) { out.push(line); line = [w]; } else line = t; });
+    if (line.length) out.push(line);
+  });
+  pages = out.map((p,i) => ({ words: p, start: p[0].start, end: Math.max(p[p.length-1].end, (out[i+1] ? Math.min(out[i+1][0].start, p[p.length-1].end + .6) : p[p.length-1].end + .6)) }));
+  window.__dur = D.dur || (ws.length ? ws[ws.length-1].end + .8 : 4);
+}
+const txt = w => D.style.upper ? w.text.toLocaleUpperCase('vi') : w.text;
+function measure(ws){ return ws.reduce((s,w,i)=>s+g.measureText(txt(w)).width+(i?spaceW():0),0); }
+const spaceW = () => D.style.size*S*0.32;
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const backOut = x => { const k=1.9; x=clamp(x); return 1+(k+1)*Math.pow(x-1,3)+k*Math.pow(x-1,2); };
+const easeOut = x => 1-Math.pow(1-clamp(x),3);
+
+window.renderFrame = (t) => {
+  g.clearRect(0,0,W,H);
+  if (!ALPHA) { g.fillStyle = '#2a3346'; g.fillRect(0,0,W,H); }
+  const st = D.style; const p = pages.find(p => t >= p.start - 0.04 && t < p.end);
+  if (!p) return;
+  g.font = `900 ${st.size*S}px BVP`; g.textBaseline = 'middle';
+  const total = measure(p.words); let x = W/2 - total/2; const y = st.y*S;
+  const pageIn = easeOut((t - p.start + 0.04)/0.12), pageOut = 1 - easeOut((t - (p.end - 0.08))/0.08);
+  p.words.forEach((w,i) => {
+    const s = txt(w), ww = g.measureText(s).width;
+    const k = (t - w.start)/0.18, shown = t >= w.start - 0.02;
+    const active = t >= w.start && t < (p.words[i+1] ? p.words[i+1].start : w.end + .3);
+    const emph = st.emphasis.some(e => (w.text||'').toLowerCase() === e.toLowerCase());
+    let sc = shown ? 0.62 + 0.38*backOut(k) : 0.62, al = shown ? clamp(k*2.5) : 0;
+    if (st.preset !== 'pop') { sc = 1; al = 1; }               // box/underline: hiện cả trang, tô từ đang nói
+    al *= pageIn * pageOut;
+    g.save(); g.globalAlpha = al; g.translate(x + ww/2, y); g.scale(sc, sc);
+    if (st.preset === 'box' && active) {
+      const pad = st.size*S*0.18; g.fillStyle = st.accent;
+      roundRect(-ww/2-pad, -st.size*S*0.62, ww+pad*2, st.size*S*1.24, st.size*S*0.18); g.fill();
+    }
+    g.lineJoin = 'round'; g.lineWidth = st.size*S*0.16; g.strokeStyle = st.stroke;
+    g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = st.size*S*0.22; g.shadowOffsetY = st.size*S*0.06;
+    if (!(st.preset === 'box' && active)) g.strokeText(s, -ww/2, 0);
+    g.shadowColor = 'transparent';
+    g.fillStyle = (st.preset === 'box' && active) ? st.boxText : emph ? st.warn : active ? st.accent : st.text;
+    g.fillText(s, -ww/2, 0);
+    if (st.preset === 'underline' && active) { g.fillStyle = st.accent; g.fillRect(-ww/2, st.size*S*0.52, ww*easeOut((t-w.start)/0.15), st.size*S*0.09); }
+    g.restore();
+    x += ww + spaceW();
+  });
+};
+function roundRect(x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+
+build();
+document.fonts.load(`900 58px BVP`).then(()=>{ build(); if (Q.get('render')!=='1') { const t0=performance.now(); (function loop(){ renderFrame(((performance.now()-t0)/1000)%__dur); requestAnimationFrame(loop); })(); } });
+</script></body></html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-Medium.ttf');font-weight:500}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-SemiBold.ttf');font-weight:600}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-ExtraBold.ttf');font-weight:800}
+@font-face{font-family:'BVP';src:url('../fonts/BeVietnamPro-Black.ttf');font-weight:900}
+html,body{margin:0;background:#111}canvas{display:block;max-width:100vw;max-height:100vh}
+</style></head><body><canvas id="c"></canvas>
+<script>
+// edit-chat-story — kịch bản tin nhắn (khách ↔ chatbot/nhân viên) dựng thành video 9:16.
+// Hợp đồng: renderFrame(t), __dur, setData(obj), __cues (mốc SFX).
+const Q = new URLSearchParams(location.search);
+const W = +Q.get('w') || 1080, H = +Q.get('h') || 1920, ALPHA = Q.get('alpha') === '1';
+const c = document.getElementById('c'); c.width = W; c.height = H; const g = c.getContext('2d');
+const S = W / 1080;
+
+let D = {
+  hook: { text: 'Khách nhắn lúc 23h — ai trả lời?', from: 0, to: 2.6 },
+  header: { name: 'Trợ lý AI · Shop Mỹ Phẩm Lan', status: 'Đang hoạt động', avatar: 'AI' },
+  messages: [
+    { from: 'khach', text: 'Shop ơi kem chống nắng còn hàng không ạ?', delay: 0.6 },
+    { from: 'bot', text: 'Dạ còn ạ! Chị dùng cho da dầu hay da khô để em tư vấn đúng loại nha 😊', typing: 1.2 },
+    { from: 'khach', text: 'Da dầu, hay bị mụn', delay: 0.8 },
+    { from: 'bot', card: { title: 'Kem chống nắng kiềm dầu SPF50', price: '289.000đ', button: 'Đặt ngay' }, typing: 1.0 },
+    { from: 'bot', text: 'Chị đặt trước 0h hôm nay được freeship nha!', typing: 0.9, emphasis: true },
+    { from: 'khach', text: 'Lấy cho chị 2 hộp', delay: 0.8, reaction: '❤️' },
+  ],
+  end: { text: 'Chatbot trả lời 24/7 — không bỏ sót đơn', cta: 'Inbox để dùng thử', hold: 2.8 },
+  palette: { bg_top:'#091833', bg_bottom:'#060E22', glow1:'#6030D0', glow2:'#40B090', text:'#F5F7FA', muted:'#9FB0CC',
+             accent:'#3FD6A6', accent2:'#8A6BFF', warn:'#FF6B6B', phone:'#0B1220', screen:'#F4F6FA',
+             me:'#2F6BFF', meText:'#FFFFFF', them:'#FFFFFF', themText:'#111827', headerBg:'#FFFFFF' },
+  read: 0.03,    // giây đọc mỗi ký tự sau mỗi tin (0.7–2.2s)
+};
+window.setData = d => { D = { ...D, ...d, palette: { ...D.palette, ...(d.palette||{}) } }; build(); };
+
+// ── layout & timeline ─────────────────────────────────────────────────────
+const PH = { x: 110, y: 250, w: 860, h: 1230, r: 70 };       // khung điện thoại (trong safe zone)
+const SCR = { x: PH.x + 22, y: PH.y + 22, w: PH.w - 44, h: PH.h - 44, r: 52 };
+const HEAD_H = 150, INPUT_H = 110, PADX = 34, GAP = 22, FS = 34, LH = 46, BMAX = 0.74;
+let items = [], cues = [], T_END = 0, chatStart = 0;
+
+function wrap(text, maxW, font) {
+  g.font = font; const out = []; let line = '';
+  for (const w of text.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t;
+  }
+  if (line) out.push(line); return out;
+}
+function build() {
+  items = []; cues = []; const p = D.palette;
+  chatStart = D.hook && D.hook.text ? D.hook.to : 0.3;
+  let t = chatStart + 0.4, prevLen = 0;
+  const maxW = (SCR.w - PADX * 2) * BMAX * S - 36 * S;
+  D.messages.forEach((m, i) => {
+    const readGap = i ? Math.min(2.2, Math.max(0.7, prevLen * D.read)) : 0;
+    let typingFrom = null;
+    if (m.from === 'bot') { typingFrom = t + Math.min(readGap, 0.6); t = typingFrom + (m.typing ?? 1.0); }
+    else t += readGap + (m.delay ?? 0.5);
+    const it = { ...m, at: t, typingFrom };
+    if (m.card) { it.h = 300 * S; it.w = maxW + 36 * S; it.lines = []; }
+    else { it.lines = wrap(m.text, maxW, `500 ${FS * S}px BVP`);
+      g.font = `500 ${FS * S}px BVP`;
+      it.w = Math.max(...it.lines.map(l => g.measureText(l).width)) + 36 * S; it.h = it.lines.length * LH * S + 30 * S; }
+    items.push(it);
+    if (typingFrom != null) cues.push({ t: +typingFrom.toFixed(3), sfx: 'typing', note: 'chấm đang soạn' });
+    cues.push({ t: +t.toFixed(3), sfx: m.from === 'bot' ? 'receive' : 'send', note: (m.text || m.card.title).slice(0, 40) });
+    if (m.reaction) cues.push({ t: +(t + 0.45).toFixed(3), sfx: 'pop', note: 'thả cảm xúc' });
+    prevLen = (m.text || m.card.title).length;
+  });
+  T_END = t + Math.max(1.2, prevLen * D.read);
+  if (D.end && D.end.text) cues.push({ t: +T_END.toFixed(3), sfx: 'whoosh', note: 'cảnh kết' });
+  window.__cues = cues;
+  window.__dur = T_END + (D.end && D.end.text ? D.end.hold : 0.8);
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeInOut = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const backOut = x => { const k = 1.7; x = clamp(x); return 1 + (k + 1) * Math.pow(x - 1, 3) + k * Math.pow(x - 1, 2); };
+function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+const X = v => v * S;
+
+function background(t) {
+  const p = D.palette;
+  if (ALPHA) return;
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, p.bg_top); gr.addColorStop(1, p.bg_bottom);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  const glow = (x, y, r, col, a) => { const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col + Math.round(a * 255).toString(16).padStart(2, '0')); rg.addColorStop(1, col + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
+  glow(W * (0.85 + 0.03 * Math.sin(t * .4)), H * 0.12, W * 0.8, p.glow1, .35);
+  glow(W * 0.1, H * (0.9 + 0.02 * Math.cos(t * .5)), W * 0.7, p.glow2, .18);
+}
+
+function phone(t, alpha, lift) {
+  const p = D.palette;
+  g.save(); g.globalAlpha = alpha; g.translate(0, lift);
+  g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = X(60); g.shadowOffsetY = X(30);
+  g.fillStyle = p.phone; rr(X(PH.x), X(PH.y), X(PH.w), X(PH.h), X(PH.r)); g.fill(); g.shadowColor = 'transparent';
+  g.fillStyle = p.screen; rr(X(SCR.x), X(SCR.y), X(SCR.w), X(SCR.h), X(SCR.r)); g.fill();
+  g.save(); rr(X(SCR.x), X(SCR.y), X(SCR.w), X(SCR.h), X(SCR.r)); g.clip();
+  messages(t);
+  // header
+  g.fillStyle = p.headerBg; g.fillRect(X(SCR.x), X(SCR.y), X(SCR.w), X(HEAD_H));
+  g.fillStyle = 'rgba(17,24,39,.08)'; g.fillRect(X(SCR.x), X(SCR.y + HEAD_H - 2), X(SCR.w), X(2));
+  const ax = X(SCR.x + 80), ay = X(SCR.y + HEAD_H / 2 + 8);
+  g.fillStyle = p.accent2; g.beginPath(); g.arc(ax, ay, X(38), 0, 7); g.fill();
+  g.fillStyle = '#fff'; g.font = `800 ${X(26)}px BVP`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(D.header.avatar, ax, ay + X(1));
+  g.fillStyle = '#22C55E'; g.beginPath(); g.arc(ax + X(27), ay + X(27), X(9), 0, 7); g.fill();
+  g.textAlign = 'left'; g.fillStyle = '#111827'; g.font = `800 ${X(30)}px BVP`; g.fillText(fit(D.header.name, X(SCR.w - 180), `800 ${X(30)}px BVP`), X(SCR.x + 136), ay - X(16));
+  g.fillStyle = '#6B7280'; g.font = `500 ${X(24)}px BVP`; g.fillText(D.header.status, X(SCR.x + 136), ay + X(22));
+  // input bar
+  const iy = SCR.y + SCR.h - INPUT_H;
+  g.fillStyle = '#FFFFFF'; g.fillRect(X(SCR.x), X(iy), X(SCR.w), X(INPUT_H));
+  g.fillStyle = '#EEF1F6'; rr(X(SCR.x + 28), X(iy + 22), X(SCR.w - 140), X(64), X(32)); g.fill();
+  g.fillStyle = '#9CA3AF'; g.font = `500 ${X(26)}px BVP`; g.fillText('Nhập tin nhắn…', X(SCR.x + 56), X(iy + 55));
+  g.fillStyle = p.me; g.beginPath(); g.arc(X(SCR.x + SCR.w - 62), X(iy + 54), X(32), 0, 7); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); const sx = X(SCR.x + SCR.w - 62), sy = X(iy + 54); g.moveTo(sx - X(12), sy - X(13)); g.lineTo(sx + X(15), sy); g.lineTo(sx - X(12), sy + X(13)); g.lineTo(sx - X(6), sy); g.closePath(); g.fill();
+  g.restore(); g.restore();
+}
+function fit(s, maxW, font) { g.font = font; if (g.measureText(s).width <= maxW) return s; while (s.length && g.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; }
+
+function messages(t) {
+  const p = D.palette;
+  const top = SCR.y + HEAD_H + 26, bottom = SCR.y + SCR.h - INPUT_H - 26;
+  // vị trí stack
+  let y = 0; const pos = [];
+  const vis = items.filter(it => t >= (it.typingFrom ?? it.at));
+  vis.forEach((it, i) => { pos.push(y); y += it.h / S + GAP; });
+  // typing bubble chiếm chỗ khi đang soạn
+  const contentH = y;
+  // cuộn mượt: mục tiêu = đáy nội dung chạm đáy vùng chat
+  const target = Math.max(0, contentH - (bottom - top));
+  let scroll = target;
+  const last = vis[vis.length - 1];
+  if (last) { const k = easeInOut((t - (last.typingFrom ?? last.at)) / 0.35); const prevT = Math.max(0, (contentH - last.h / S - GAP) - (bottom - top)); scroll = prevT + (target - prevT) * k; }
+  vis.forEach((it, i) => {
+    const typing = it.typingFrom != null && t < it.at;
+    const me = it.from === 'khach';
+    const k = typing ? easeOut((t - it.typingFrom) / 0.2) : backOut((t - it.at) / 0.32);
+    const bw = typing ? X(120) : it.w, bh = typing ? X(70) : it.h;
+    const bx = me ? X(SCR.x + SCR.w - PADX) - bw : X(SCR.x + PADX);
+    const by = X(top + pos[i] - scroll);
+    g.save(); g.globalAlpha = clamp(k * 1.4);
+    const ox = me ? bx + bw : bx, oy = by + bh;
+    g.translate(ox, oy); g.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k); g.translate(-ox, -oy + (1 - clamp(k)) * X(30));
+    if (it.card && !typing) card(it, bx, by, bw, bh);
+    else {
+      g.shadowColor = 'rgba(17,24,39,.10)'; g.shadowBlur = X(14); g.shadowOffsetY = X(4);
+      g.fillStyle = me ? p.me : p.them; rr(bx, by, bw, bh, X(28)); g.fill(); g.shadowColor = 'transparent';
+      if (it.emphasis && !typing) { g.strokeStyle = p.accent; g.lineWidth = X(4); rr(bx, by, bw, bh, X(28)); g.stroke(); }
+      if (typing) { for (let d = 0; d < 3; d++) { const ph = Math.sin((t - it.typingFrom) * 9 - d * 0.9); g.fillStyle = `rgba(107,114,128,${0.45 + 0.4 * Math.max(0, ph)})`; g.beginPath(); g.arc(bx + X(34 + d * 26), by + bh / 2 - X(5) * Math.max(0, ph), X(9), 0, 7); g.fill(); } }
+      else { g.fillStyle = me ? p.meText : p.themText; g.font = `500 ${X(FS)}px BVP`; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+        it.lines.forEach((l, j) => g.fillText(l, bx + X(18), by + X(15 + 34 + j * LH) - X(4))); }
+    }
+    if (it.reaction && t > it.at + 0.45) { const r = backOut((t - it.at - 0.45) / 0.3); g.font = `${X(34) * r}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.beginPath(); g.arc(bx + X(6), by + bh - X(2), X(26) * r, 0, 7); g.fill(); g.fillText(it.reaction, bx + X(6), by + bh); }
+    g.restore();
+  });
+}
+function card(it, x, y, w, h) {
+  const p = D.palette, c = it.card;
+  g.shadowColor = 'rgba(17,24,39,.12)'; g.shadowBlur = X(18); g.shadowOffsetY = X(5);
+  g.fillStyle = '#fff'; rr(x, y, w, h, X(28)); g.fill(); g.shadowColor = 'transparent';
+  const gr = g.createLinearGradient(x, y, x + w, y + X(150)); gr.addColorStop(0, p.accent2); gr.addColorStop(1, p.accent);
+  g.save(); rr(x, y, w, h, X(28)); g.clip(); g.fillStyle = gr; g.fillRect(x, y, w, X(140)); g.restore();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.font = `800 ${X(26)}px BVP`; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(c.badge || 'SẢN PHẨM', x + X(22), y + X(40));
+  g.fillStyle = '#111827'; g.font = `800 ${X(30)}px BVP`; g.fillText(fit(c.title, w - X(44), `800 ${X(30)}px BVP`), x + X(22), y + X(178));
+  g.fillStyle = p.warn; g.font = `900 ${X(34)}px BVP`; g.fillText(c.price || '', x + X(22), y + X(226));
+  g.fillStyle = p.me; rr(x + w - X(200), y + X(205), X(178), X(60), X(30)); g.fill();
+  g.fillStyle = '#fff'; g.font = `800 ${X(26)}px BVP`; g.textAlign = 'center'; g.fillText(c.button || 'Xem', x + w - X(111), y + X(236));
+}
+
+function hook(t) {
+  const h = D.hook; if (!h || !h.text) return 0;
+  const k = easeOut((t - h.from) / 0.4), out = easeInOut((t - (h.to - 0.35)) / 0.35);
+  const p = D.palette; const lines = wrap(h.text, X(860), `900 ${X(84)}px BVP`);
+  g.save(); g.globalAlpha = clamp(k) * (1 - out); g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 ${X(84)}px BVP`; g.fillStyle = p.text; g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = X(24);
+  lines.forEach((l, i) => g.fillText(l, W / 2, X(820) + (i - (lines.length - 1) / 2) * X(108) + (1 - k) * X(40)));
+  g.restore(); return 1 - out;
+}
+function ending(t) {
+  const e = D.end; if (!e || !e.text || t < T_END) return 0;
+  const k = easeOut((t - T_END) / 0.5), p = D.palette;
+  g.save(); g.globalAlpha = k; g.fillStyle = 'rgba(6,14,34,.82)'; g.fillRect(0, 0, W, H);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const lines = wrap(e.text, X(840), `900 ${X(72)}px BVP`);
+  g.font = `900 ${X(72)}px BVP`; g.fillStyle = p.text;
+  lines.forEach((l, i) => g.fillText(l, W / 2, X(760) + i * X(94) + (1 - k) * X(30)));
+  if (e.cta) { const k2 = backOut((t - T_END - 0.5) / 0.4); const bw = X(560), bh = X(110), by = X(760) + lines.length * X(94) + X(80);
+    g.save(); g.translate(W / 2, by + bh / 2); g.scale(k2, k2); g.fillStyle = p.accent; rr(-bw / 2, -bh / 2, bw, bh, bh / 2); g.fill();
+    g.fillStyle = '#06121F'; g.font = `900 ${X(48)}px BVP`; g.fillText(e.cta, 0, X(2)); g.restore(); }
+  g.restore(); return k;
+}
+
+window.renderFrame = t => {
+  g.clearRect(0, 0, W, H); background(t);
+  const hv = hook(t);
+  const pk = easeOut((t - chatStart + 0.2) / 0.5);
+  if (t > chatStart - 0.2) phone(t, clamp(pk), (1 - pk) * X(120));
+  ending(t);
+};
+build();
+document.fonts.load(`500 34px BVP`).then(() => document.fonts.load(`900 34px BVP`)).then(() => { build();
+  if (Q.get('render') !== '1') { const t0 = performance.now(); (function loop() { renderFrame(((performance.now() - t0) / 1000) % __dur); requestAnimationFrame(loop); })(); } });
+window.__ready = document.fonts.load(`800 34px BVP`).then(() => document.fonts.load(`600 34px BVP`)).then(() => { build(); return 1; });
+</script></body></html>

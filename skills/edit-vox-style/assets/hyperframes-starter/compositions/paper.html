@@ -1,0 +1,37 @@
+<template>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#ded1ba;font-family:Arial,sans-serif}
+#root{position:relative;width:1280px;height:720px;overflow:hidden;color:#28251f}
+.scene{position:absolute;inset:0;overflow:hidden}
+#root{background:#ded1ba url('assets/paper.png') center/cover}
+.kicker{position:absolute;left:110px;top:83px;font-size:20px;letter-spacing:4px;font-weight:bold}
+.footer{position:absolute;left:110px;bottom:60px;font-size:20px;letter-spacing:2px}
+.card{position:absolute;left:300px;top:210px;width:680px;height:310px;filter:drop-shadow(7px 9px 7px #0003)}
+.sheet{height:100%;padding:49px;background:#f4ebda;clip-path:polygon(1% 1%,20% 0,22% 2%,48% 0,76% 2%,99% 0,100% 28%,99% 48%,100% 72%,98% 100%,70% 98%,45% 100%,22% 98%,0 100%,1% 67%,0 36%)}
+h1{font-size:74px;line-height:1.02;letter-spacing:-3px;margin:8px 0 16px}p{font-size:24px;margin:0;line-height:1.5}
+.tape{position:absolute;width:145px;height:37px;background:#c4a33dbb;top:-15px;left:42px;rotate:-6deg}
+#red-label{position:absolute;left:720px;top:495px;padding:13px 25px;background:#a53a2e;color:#fff;font-size:22px;font-weight:bold}
+#evidence{background:#f9f9f5}
+#document{position:absolute;left:210px;top:170px;width:860px;height:420px;padding:40px 52px;background:white;border-top:9px solid #234b75;box-shadow:0 8px 24px #0001;transform-origin:50% 48%}
+.meta{font-size:22px;letter-spacing:2px;color:#444;margin-bottom:22px}
+h2{font-size:43px;line-height:1.15;letter-spacing:-1px;margin:0 0 24px}
+.line{position:relative;display:table;font-size:27px;line-height:1.6}
+.highlight{position:absolute;inset:5px -5px;background:#c9dbee;transform-origin:left center}
+.words{position:relative}
+#map{background:#294b70;color:#fff}
+#map svg{position:absolute;inset:0}
+#map-title{position:absolute;left:110px;top:100px;font-size:48px;line-height:1.1;font-weight:bold}
+#map-label{position:absolute;left:800px;top:425px;background:#f0e7d5;color:#222;padding:13px 20px;font-size:24px;font-weight:bold}
+#map-note{position:absolute;left:110px;bottom:65px;color:#e0ebf3;font-size:20px;letter-spacing:2px}
+
+#root{position:relative;overflow:hidden;} </style>
+<div id="root" data-composition-id="paper" data-start="0" data-duration="3" data-width="1280" data-height="720" data-layout-allow-overlap>
+<div class="kicker">VOX STYLE / ARCHIVAL COLLAGE</div>
+<div id="paper-card" class="card"><div class="sheet"><p>01 / DẪN VÀO CÂU CHUYỆN</p><h1>Mỗi hình ảnh<br>một vai trò.</h1></div><div class="tape"></div></div>
+<div id="red-label">TƯ LIỆU → Ý NGHĨA</div><div class="footer">MOTION STUDY · HYPERFRAMES</div>
+</div>
+<script>const tl=gsap.timeline({paused:true});
+tl.fromTo('#paper-card',{x:700,y:-100,rotation:28,opacity:0},{x:0,y:0,rotation:-2,opacity:1,duration:.7,ease:'power3.out'},0);
+tl.fromTo('#red-label',{x:30,opacity:0},{x:0,opacity:1,duration:.3,ease:'power2.out'},.65);
+window.__timelines=window.__timelines||{};window.__timelines['paper']=tl;</script>
+</template>
