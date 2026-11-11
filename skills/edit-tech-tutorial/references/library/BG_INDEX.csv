@@ -1,0 +1,93 @@
+﻿id,path,duration_s,width,height,fps,pixel_format,audio,preview_time,review
+1,E:\TaiNguyen\BG\1.mp4,30.033333,1080,1920,30/1,yuv420p,False,2,one sampled frame; loop and motion audition pending
+2,E:\TaiNguyen\BG\2.mp4,30.033333,1080,1920,30/1,yuv420p,False,2,one sampled frame; loop and motion audition pending
+3,E:\TaiNguyen\BG\3.mp4,30.033333,1080,1920,30/1,yuv420p,False,2,one sampled frame; loop and motion audition pending
+4,E:\TaiNguyen\BG\4.mp4,30.033333,1080,1920,30/1,yuv420p,False,2,one sampled frame; loop and motion audition pending
+5,E:\TaiNguyen\BG\5.mp4,30.033333,1080,1920,30/1,yuv420p,False,2,one sampled frame; loop and motion audition pending
+6,E:\TaiNguyen\BG\BG BUFFTERFLY.mp4,20.470458,1080,1920,60000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+7,E:\TaiNguyen\BG\BG moi\BG 1.mp4,9.266667,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+8,E:\TaiNguyen\BG\BG moi\BG 10.mp4,10.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+9,E:\TaiNguyen\BG\BG moi\BG 11.mp4,10.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+10,E:\TaiNguyen\BG\BG moi\BG 12.mp4,8.133333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+11,E:\TaiNguyen\BG\BG moi\BG 13.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+12,E:\TaiNguyen\BG\BG moi\BG 14.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+13,E:\TaiNguyen\BG\BG moi\BG 15.mp4,15.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+14,E:\TaiNguyen\BG\BG moi\BG 16.mp4,15.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+15,E:\TaiNguyen\BG\BG moi\BG 17.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+16,E:\TaiNguyen\BG\BG moi\BG 18.mp4,5.066667,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+17,E:\TaiNguyen\BG\BG moi\BG 19.mp4,10.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+18,E:\TaiNguyen\BG\BG moi\BG 2.mp4,12.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+19,E:\TaiNguyen\BG\BG moi\BG 20.mp4,6.166667,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+20,E:\TaiNguyen\BG\BG moi\BG 21.mp4,10.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+21,E:\TaiNguyen\BG\BG moi\BG 22.mp4,15.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+22,E:\TaiNguyen\BG\BG moi\BG 23.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+23,E:\TaiNguyen\BG\BG moi\BG 24.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+24,E:\TaiNguyen\BG\BG moi\BG 25.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+25,E:\TaiNguyen\BG\BG moi\BG 26.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+26,E:\TaiNguyen\BG\BG moi\BG 27.mp4,5.8,720,1280,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+27,E:\TaiNguyen\BG\BG moi\BG 28.mp4,5.833333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+28,E:\TaiNguyen\BG\BG moi\BG 29.mp4,5.833333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+29,E:\TaiNguyen\BG\BG moi\BG 3.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+30,E:\TaiNguyen\BG\BG moi\BG 30.mp4,5.8,720,1280,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+31,E:\TaiNguyen\BG\BG moi\BG 31.mp4,5.8,720,1280,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+32,E:\TaiNguyen\BG\BG moi\BG 32.mp4,5.833333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+33,E:\TaiNguyen\BG\BG moi\BG 33.mp4,5.8,720,1280,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+34,E:\TaiNguyen\BG\BG moi\BG 34.mp4,5.8,720,1280,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+35,E:\TaiNguyen\BG\BG moi\BG 35.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+36,E:\TaiNguyen\BG\BG moi\BG 36.mp4,6.016667,478,850,60/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+37,E:\TaiNguyen\BG\BG moi\BG 37.mp4,10.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+38,E:\TaiNguyen\BG\BG moi\BG 38.mp4,6.439771,474,850,30000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+39,E:\TaiNguyen\BG\BG moi\BG 39.mp4,5.3053,720,1280,30000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+40,E:\TaiNguyen\BG\BG moi\BG 4.mp4,5.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+41,E:\TaiNguyen\BG\BG moi\BG 40.mp4,10.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+42,E:\TaiNguyen\BG\BG moi\BG 41.mp4,9.993317,720,1280,60000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+43,E:\TaiNguyen\BG\BG moi\BG 42.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+44,E:\TaiNguyen\BG\BG moi\BG 43.mp4,2.033333,720,1280,30/1,yuv420p,True,1.0166665,one sampled frame; loop and motion audition pending
+45,E:\TaiNguyen\BG\BG moi\BG 44.mp4,2.033333,720,1280,30/1,yuv420p,True,1.0166665,one sampled frame; loop and motion audition pending
+46,E:\TaiNguyen\BG\BG moi\BG 45.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+47,E:\TaiNguyen\BG\BG moi\BG 46.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+48,E:\TaiNguyen\BG\BG moi\BG 47.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+49,E:\TaiNguyen\BG\BG moi\BG 48.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+50,E:\TaiNguyen\BG\BG moi\BG 49.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+51,E:\TaiNguyen\BG\BG moi\BG 5.mp4,5.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+52,E:\TaiNguyen\BG\BG moi\BG 50.mp4,2.033333,720,1280,30/1,yuv420p,True,1.0166665,one sampled frame; loop and motion audition pending
+53,E:\TaiNguyen\BG\BG moi\BG 51.mp4,2.033333,720,1280,30/1,yuv420p,True,1.0166665,one sampled frame; loop and motion audition pending
+54,E:\TaiNguyen\BG\BG moi\BG 52.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+55,E:\TaiNguyen\BG\BG moi\BG 53.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+56,E:\TaiNguyen\BG\BG moi\BG 54.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+57,E:\TaiNguyen\BG\BG moi\BG 55.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+58,E:\TaiNguyen\BG\BG moi\BG 56.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+59,E:\TaiNguyen\BG\BG moi\BG 57.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+60,E:\TaiNguyen\BG\BG moi\BG 58.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+61,E:\TaiNguyen\BG\BG moi\BG 59.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+62,E:\TaiNguyen\BG\BG moi\BG 6.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+63,E:\TaiNguyen\BG\BG moi\BG 60.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+64,E:\TaiNguyen\BG\BG moi\BG 61.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+65,E:\TaiNguyen\BG\BG moi\BG 62.mp4,10.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+66,E:\TaiNguyen\BG\BG moi\BG 63.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+67,E:\TaiNguyen\BG\BG moi\BG 64.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+68,E:\TaiNguyen\BG\BG moi\BG 65.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+69,E:\TaiNguyen\BG\BG moi\BG 66.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+70,E:\TaiNguyen\BG\BG moi\BG 67.mp4,5.066667,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+71,E:\TaiNguyen\BG\BG moi\BG 68.mp4,2.666667,720,1280,30/1,yuv420p,True,1.3333335,one sampled frame; loop and motion audition pending
+72,E:\TaiNguyen\BG\BG moi\BG 69.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+73,E:\TaiNguyen\BG\BG moi\BG 7.mp4,9.993317,720,1280,60000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+74,E:\TaiNguyen\BG\BG moi\BG 70.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+75,E:\TaiNguyen\BG\BG moi\BG 71.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+76,E:\TaiNguyen\BG\BG moi\BG 72.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+77,E:\TaiNguyen\BG\BG moi\BG 73.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+78,E:\TaiNguyen\BG\BG moi\BG 74.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+79,E:\TaiNguyen\BG\BG moi\BG 75.mp4,5.033333,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+80,E:\TaiNguyen\BG\BG moi\BG 76.mp4,10.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+81,E:\TaiNguyen\BG\BG moi\BG 77.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+82,E:\TaiNguyen\BG\BG moi\BG 78.mp4,20.6,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+83,E:\TaiNguyen\BG\BG moi\BG 79.mp4,6.166667,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+84,E:\TaiNguyen\BG\BG moi\BG 8.mp4,15.0,720,1280,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+85,E:\TaiNguyen\BG\BG moi\BG 80.mp4,30.03,720,1280,24000/1001,yuv420p,True,2,one sampled frame; loop and motion audition pending
+86,E:\TaiNguyen\BG\BG moi\BG 81.mp4,15.0,720,1280,25/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+87,E:\TaiNguyen\BG\BG moi\BG 82.mp4,5.033333,1280,720,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+88,E:\TaiNguyen\BG\BG moi\BG 9.mp4,10.0,720,1280,24/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+89,E:\TaiNguyen\BG\Butterfly.mov,13.36,1920,1080,25/1,yuva444p12le,False,2,one sampled frame; loop and motion audition pending
+90,E:\TaiNguyen\BG\Butterfly_1.mov,8.008,1920,1080,30000/1001,rgba,False,2,one sampled frame; loop and motion audition pending
+91,E:\TaiNguyen\BG\Comp 1_10.mp4,30.966667,1080,1920,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending
+92,E:\TaiNguyen\BG\Comp 1_7.mp4,30.966667,1080,1920,30/1,yuv420p,True,2,one sampled frame; loop and motion audition pending

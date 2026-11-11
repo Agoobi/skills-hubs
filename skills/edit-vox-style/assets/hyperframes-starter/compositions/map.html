@@ -1,0 +1,50 @@
+<template>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#ded1ba;font-family:Arial,sans-serif}
+#root{position:relative;width:1280px;height:720px;overflow:hidden;color:#28251f}
+.scene{position:absolute;inset:0;overflow:hidden}
+#paper-bg{background:#ded1ba url('assets/paper.png') center/cover}
+.kicker{position:absolute;left:110px;top:83px;font-size:20px;letter-spacing:4px;font-weight:bold}
+.footer{position:absolute;left:110px;bottom:60px;font-size:20px;letter-spacing:2px}
+.card{position:absolute;left:300px;top:210px;width:680px;height:310px;filter:drop-shadow(7px 9px 7px #0003)}
+.sheet{height:100%;padding:49px;background:#f4ebda;clip-path:polygon(1% 1%,20% 0,22% 2%,48% 0,76% 2%,99% 0,100% 28%,99% 48%,100% 72%,98% 100%,70% 98%,45% 100%,22% 98%,0 100%,1% 67%,0 36%)}
+h1{font-size:74px;line-height:1.02;letter-spacing:-3px;margin:8px 0 16px}p{font-size:24px;margin:0;line-height:1.5}
+.tape{position:absolute;width:145px;height:37px;background:#c4a33dbb;top:-15px;left:42px;rotate:-6deg}
+#red-label{position:absolute;left:720px;top:495px;padding:13px 25px;background:#a53a2e;color:#fff;font-size:22px;font-weight:bold}
+#evidence{background:#f9f9f5}
+#document{position:absolute;left:210px;top:170px;width:860px;height:420px;padding:40px 52px;background:white;border-top:9px solid #234b75;box-shadow:0 8px 24px #0001;transform-origin:50% 48%}
+.meta{font-size:22px;letter-spacing:2px;color:#444;margin-bottom:22px}
+h2{font-size:43px;line-height:1.15;letter-spacing:-1px;margin:0 0 24px}
+.line{position:relative;display:table;font-size:27px;line-height:1.6}
+.highlight{position:absolute;inset:5px -5px;background:#c9dbee;transform-origin:left center}
+.words{position:relative}
+#root{background:#294b70;color:#fff}
+#root svg{position:absolute;inset:0}
+#map-title{position:absolute;left:110px;top:100px;font-size:48px;line-height:1.1;font-weight:bold}
+#map-label{position:absolute;left:800px;top:425px;background:#f0e7d5;color:#222;padding:13px 20px;font-size:24px;font-weight:bold}
+#map-note{position:absolute;left:110px;bottom:65px;color:#e0ebf3;font-size:20px;letter-spacing:2px}
+
+#root{position:relative;overflow:hidden;} </style>
+<div id="root" data-composition-id="map" data-start="0" data-duration="4" data-width="1280" data-height="720" data-layout-allow-overlap>
+<svg viewBox="0 0 1280 720" aria-label="Sơ đồ minh họa tuyến đường">
+<defs><pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#fff" stroke-opacity=".08"/></pattern></defs>
+<rect width="1280" height="720" fill="url(#grid)"/>
+<path d="M900 0L855 120 925 220 860 280 930 330 1010 295 1100 380 1280 300V0Z" fill="#b9d1df"/>
+<path d="M0 500L130 475 220 535 200 620 350 720H0Z" fill="#b9d1df"/>
+<path id="route" d="M330 405 Q570 200 790 370" fill="none" stroke="#d7e7f2" stroke-width="4"/>
+<circle cx="330" cy="405" r="9" fill="#ef695c"/>
+<circle id="destination" cx="790" cy="370" r="12" fill="#ef695c"/>
+<circle id="ring" cx="790" cy="370" r="42" fill="none" stroke="#66b2ec" stroke-width="4"/>
+<path id="leader" d="M810 398L840 425" stroke="#fff" stroke-width="2"/>
+</svg><div id="map-title">Từ một điểm,<br>mở ra bối cảnh.</div><div id="map-label">ĐỊA ĐIỂM B</div>
+<div id="map-note">03 / SƠ ĐỒ MINH HỌA · KHÔNG PHẢI BẢN ĐỒ ĐỊA LÝ</div>
+</div>
+<script>const tl=gsap.timeline({paused:true});
+const route=document.querySelector('#route'),len=route.getTotalLength();
+tl.fromTo(route,{strokeDasharray:len,strokeDashoffset:len},{strokeDashoffset:0,duration:.85,ease:'power1.inOut'},0.15);
+tl.fromTo('#destination',{opacity:0},{opacity:1,duration:.15},0.9);
+tl.fromTo('#ring',{opacity:0},{opacity:.9,duration:.25},1.0);
+tl.fromTo('#leader',{opacity:0},{opacity:1,duration:.2},1.2);
+tl.fromTo('#map-label',{y:12,opacity:0},{y:0,opacity:1,duration:.3,ease:'power2.out'},1.35);
+window.__timelines=window.__timelines||{};window.__timelines['map']=tl;</script>
+</template>

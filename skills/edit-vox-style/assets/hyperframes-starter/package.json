@@ -1,0 +1,6 @@
+{
+  "name": "vox-style-starter",
+  "private": true,
+  "scripts": { "check": "hyperframes check .", "preview": "hyperframes preview .", "render": "hyperframes render . -o renders/film.mp4 --fps 30 --workers 1" },
+  "dependencies": { "hyperframes": "0.8.201", "gsap": "3.15.0" }
+}
