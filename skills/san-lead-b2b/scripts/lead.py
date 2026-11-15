@@ -449,7 +449,8 @@ văn phòng phẩm, quà tặng) hay mua xe, máy tính văn phòng; thiết b�
 măng, may mặc, cảng, đường giao thông, bất động sản...); nhà máy đã khánh thành mà không nói giai đoạn tiếp theo; tin
 không nêu được tên doanh nghiệp / chủ đầu tư; trang danh sách, trang tìm việc chung, trang giới thiệu dịch vụ;
 trang "dự án đã thực hiện" / "công trình tiêu biểu" của nhà thầu, nhà cung cấp, đơn vị thiết kế (việc đã xong, không
-phải nhu cầu mới); tin chuyển nhượng, mua bán nhà máy; mời thầu đã có kết quả / đã đóng.
+phải nhu cầu mới); tin chuyển nhượng, mua bán nhà máy; mời thầu đã có kết quả / đã đóng; tin hợp tác, ký kết ghi nhớ
+(MoU), "triển vọng", hội thảo mà không có dự án nhà máy cụ thể (tên, địa điểm, vốn hoặc mốc thời gian).
 
 Quy tắc điền:
 - company: tên đầy đủ nhất có trong nguồn (VD "Công ty Cổ phần Dược Hậu Giang"). Nguồn không có tên doanh nghiệp /
@@ -557,6 +558,14 @@ def normalise(o, candidate):
         equipment = re.split(r"[;,\n]+", equipment)
     o["equipment"] = [str(e).strip() for e in equipment if isinstance(e, (str, int)) and len(str(e).strip()) >= 3][:12]
     o["equipment_inferred"] = bool(o.get("equipment_inferred")) if o["equipment"] else False
+    if o["equipment"] and not o["equipment_inferred"]:
+        # model noi "nguon co neu" ma bai khong co thiet bi nao trong danh sach: la goi y
+        source = fold(" ".join(str(candidate.get(k) or "") for k in ("title", "snippet", "text")))
+        def stated(item):
+            words = [w for w in fold(item).split() if len(w) >= 3]
+            return fold(item) in source or (words and all(f" {w} " in f" {source} " for w in words))
+        if not any(stated(e) for e in o["equipment"]):
+            o["equipment_inferred"] = True
     hint = candidate.get("hint") or ""
     if o.get("industry") not in INDUSTRY_KEYS:
         m = re.search(r"industry=(\w+)", candidate.get("meta", ""))
@@ -1015,6 +1024,9 @@ def read_items(cfg, items):
             verdicts.append({"url": it["url"], "verdict": ("giữ: " if r.get("keep") else "loại: ") + str(r.get("reason") or "")[:150]})
             if r.get("keep") and isinstance(r.get("opportunity"), dict):
                 o = normalise(r["opportunity"], it)
+                if not (o.get("published") or it.get("date")) and it.get("origin") != "Trang theo dõi" and o.get("kind") != "moi_thau":
+                    verdicts[-1]["verdict"] = "loại: không rõ ngày tin (trang không chính thức, có thể là việc cũ)"
+                    continue
                 o["sources"] = [{"url": it["url"], "title": it["title"], "published": o.get("published") or it.get("date") or ""}]
                 if not o.get("published"):
                     o["published"] = it.get("date") or ""
