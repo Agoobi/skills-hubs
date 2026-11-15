@@ -48,7 +48,7 @@ ACTOR_LINKEDIN = "harvestapi~linkedin-profile-search"
 PRICE_GOOGLE_PAGE = 0.0045  # tren goi Free; goi tra phi re hon
 PRICE_LINKEDIN_PAGE = 0.10  # 1 trang 25 ho so rut gon
 LLM_BATCH = 6
-LLM_WORKERS = 3
+LLM_WORKERS = int(os.environ.get("LEAD_LLM_WORKERS") or 1)  # 1: cong LLM giu tien theo tung request dong thoi, vi it tien thi song song bi 402
 FETCH_WORKERS = 8
 TEXT_CHARS = 1800
 
@@ -95,7 +95,6 @@ WATCH_DEFAULT = [
     {"url": "https://www.camau.gov.vn/danh-gia-tac-dong-moi-truong-child", "label": "ĐTM tỉnh Cà Mau", "kind": "dtm"},
     {"url": "https://snnmt.khanhhoa.gov.vn/danh-sach-tin/categoryid/quyet-dinh-phe-duyet-dtm?BCMenu=BCM_9066",
      "label": "ĐTM tỉnh Khánh Hòa", "kind": "dtm"},
-    {"url": "https://danang.gov.vn/ttdt/csdl/dtm-du-an", "label": "ĐTM TP Đà Nẵng", "kind": "dtm"},
     {"url": "https://dhgpharma.com.vn/vi/thong-bao", "label": "Thông báo DHG Pharma", "kind": "tender",
      "company": "Công ty Cổ phần Dược Hậu Giang", "industry": "duoc", "province": "Cần Thơ"},
     {"url": "https://bidiphar.com/category/thong-tin-moi-thau/", "label": "Mời thầu Bidiphar", "kind": "tender",
@@ -485,7 +484,8 @@ Quy tắc điền:
   chủ đầu tư thì company = "" (vẫn được giữ nếu là tin Google News chỉ có tiêu đề: hệ thống sẽ đọc bài gốc). Không bịa.
 - title: tên gói thầu / tên dự án như nguồn. moi_thau bắt buộc có.
 - summary: 1-2 câu tiếng Việt, chỉ sự thật trong nguồn (quy mô, vốn, công suất nếu có).
-- province: tỉnh/thành viết như nguồn (tên cũ hay mới đều được). Không rõ thì "". location: KCN/CCN/xã/huyện nếu có.
+- province: tỉnh/thành NƠI ĐẶT nhà máy / dự án chính, viết như nguồn (tên cũ hay mới đều được); tin nhắc nhiều nơi thì
+  lấy nơi đặt nhà máy được nói tới chính, không chọn tỉnh chỉ để lọt vùng. Không rõ thì "". location: KCN/CCN/xã nếu có.
 - equipment: thiết bị nguồn NÊU RÕ (equipment_inferred=false). Nếu nguồn không nêu, suy ra 3-5 hạng mục thiết bị điển
   hình loại nhà máy đó cần, ưu tiên hàng bên bán có, và đặt equipment_inferred=true. Mỗi hạng mục là MỘT thiết bị, tối
   đa 6 từ (VD "Tủ an toàn sinh học", "Máy phân tích NIR"), không gộp nhiều thiết bị, không mở ngoặc liệt kê.
