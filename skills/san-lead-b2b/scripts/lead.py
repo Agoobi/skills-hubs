@@ -370,14 +370,39 @@ _REASONING_OFF = {"reasoning": {"enabled": False}}  # model suy nghi truoc thi a
 _reasoning_param_ok = [os.environ.get("LEAD_LLM_REASONING") != "1"]
 
 
+# Model du phong: LEAD_LLM_MODELS="a,b,c". Model dang dung het tien (402) hoac het luot (429) thi chuyen sang model sau.
+_models = {"list": [], "at": 0}
+_models_lock = __import__("threading").Lock()
+
+
+def _current_model(llm):
+    with _models_lock:
+        if not _models["list"]:
+            extra = [m.strip() for m in os.environ.get("LEAD_LLM_MODELS", "").split(",") if m.strip()]
+            _models["list"] = extra or [llm["model"]]
+        return _models["list"][_models["at"]] if _models["at"] < len(_models["list"]) else None
+
+
+def _next_model(failed):
+    with _models_lock:
+        if _models["at"] < len(_models["list"]) and _models["list"][_models["at"]] == failed:
+            _models["at"] += 1
+            if _models["at"] < len(_models["list"]):
+                log(f"Model {failed} hết tiền / hết lượt, chuyển sang {_models['list'][_models['at']]}")
+        return _models["at"] < len(_models["list"])
+
+
 def llm_chat(llm, system, user, max_tokens=3500):
     if llm.get("error"):
         raise RuntimeError(f"LLM: {llm['error']}")
     if _wallet_empty:
         raise WalletEmpty(_wallet_empty[0])
     last = None
-    for attempt in range(3):
-        body = {"model": llm["model"], "temperature": 0, "max_tokens": max_tokens,
+    for attempt in range(4):
+        model = _current_model(llm)
+        if model is None:
+            raise WalletEmpty(_wallet_empty[0] if _wallet_empty else "mọi model đều hết tiền / hết lượt")
+        body = {"model": model, "temperature": 0, "max_tokens": max_tokens,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                 **(_REASONING_OFF if _reasoning_param_ok[0] else {})}
         try:
@@ -390,8 +415,11 @@ def llm_chat(llm, system, user, max_tokens=3500):
         except Truncated:
             raise
         except RuntimeError as error:
-            if "-> 402" in str(error):
-                message = "ví LLM của Hermes hết tiền (402): nạp thêm rồi quét lại"
+            if "-> 402" in str(error) or ("-> 429" in str(error) and "hết lượt" in str(error)):
+                if _next_model(model):
+                    continue
+                message = ("ví LLM của Hermes hết tiền (402): nạp thêm rồi quét lại" if "-> 402" in str(error)
+                           else "model LLM hết lượt hôm nay (429)")
                 _wallet_empty.append(message)
                 raise WalletEmpty(message) from None
             if "reasoning" in str(error).lower() and _reasoning_param_ok[0]:

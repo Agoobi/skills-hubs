@@ -29,6 +29,8 @@ Bình Định bị coi là ngoài vùng).
 
 - Model: model của Hermes (Cài đặt → Model đọc tin để đổi). Gọi với `reasoning: {enabled: false}`: model suy luận trước
   thì ăn hết token và trả JSON cụt.
+- Model dự phòng: `LEAD_LLM_MODELS="model1,model2"`. Model đang dùng hết tiền (402) hoặc hết lượt (429) thì tự
+  chuyển sang model sau; hết cả danh sách thì dừng gọi LLM và Apify, tin chưa đọc để lần sau.
 - Lô 6 tin, 3 lô song song. JSON lỗi hoặc hết token: chia đôi lô, đọc lại. Tin model bỏ sót: không đánh dấu đã đọc, lần
   sau đọc lại. Lỗi 402 (ví hết tiền): dừng mọi lượt gọi LLM còn lại, ghi rõ vào lần quét.
 - Giữ khi: 1 doanh nghiệp / chủ đầu tư cụ thể ở Việt Nam, thuộc 7 ngành, và có tín hiệu mua: mời thầu / chào giá
