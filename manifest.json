@@ -66,7 +66,7 @@
       "id": "san-lead-b2b",
       "path": "skills/san-lead-b2b",
       "name": "Bot Săn lead B2B",
-      "summary": "Quét mời thầu, dự án nhà máy mới, ĐTM, mở rộng; tìm người ra quyết định trên LinkedIn; ghi vào trang Săn lead của Open WebUI",
+      "summary": "Quét mời thầu, dự án nhà máy mới, ĐTM; tìm người ra quyết định trên LinkedIn; ghi vào Săn lead của Open WebUI",
       "category": "sales",
       "icon": "target",
       "tags": ["lead", "b2b", "apify", "linkedin", "dau-thau", "open-webui"],
