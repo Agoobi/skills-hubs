@@ -63,6 +63,19 @@
       "featured": false
     },
     {
+      "id": "san-lead-b2b",
+      "path": "skills/san-lead-b2b",
+      "name": "Bot Săn lead B2B",
+      "summary": "Quét mời thầu, dự án nhà máy mới, ĐTM; tìm người ra quyết định trên LinkedIn; ghi vào Săn lead của Open WebUI",
+      "category": "sales",
+      "icon": "target",
+      "tags": ["lead", "b2b", "apify", "linkedin", "dau-thau", "open-webui"],
+      "version": "0.1.0",
+      "agents": ["hermes"],
+      "requires": { "toolsets": ["terminal"], "env": [] },
+      "featured": true
+    },
+    {
       "id": "viet-bai-zalo-oa",
       "path": "skills/viet-bai-zalo-oa",
       "name": "Bot Viết bài Zalo OA",
