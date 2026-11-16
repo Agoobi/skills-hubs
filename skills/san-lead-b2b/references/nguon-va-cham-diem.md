@@ -5,7 +5,7 @@
 | Nguồn | Cách lấy | Tiền | Ghi chú |
 | --- | --- | --- | --- |
 | Google News | RSS `news.google.com/rss/search`, 3 truy vấn × mỗi ngành (khởi công / cấp phép / mở rộng), `when:<n>d` | 0 | Chỉ có tiêu đề + tên báo. Tin được giữ thì script tìm **bài gốc** (`site:<báo> "<tiêu đề>"`) và đọc lại toàn văn. |
-| Trang theo dõi | Đọc trang danh sách, lấy link mới có từ khoá phù hợp | 0 | Sẵn: ĐTM Cà Mau, Khánh Hòa, Đà Nẵng; thông báo DHG Pharma, Bidiphar. Thêm ở Cài đặt. |
+| Trang theo dõi | Đọc trang danh sách, lấy link mới có từ khoá phù hợp | 0 | Sẵn: ĐTM Cà Mau, Khánh Hòa; thông báo DHG Pharma, Bidiphar (bỏ ĐTM Đà Nẵng: trang đó là kho lưu trữ cũ). Thêm ở Cài đặt. |
 | Google (Apify `apify~google-search-scraper`) | 18 truy vấn / lần, quay vòng nhóm thiết bị, ngành, tỉnh | ~$0.0045 / truy vấn | Thư mời chào giá theo nhóm thiết bị; khởi công / cấp phép / mở rộng / ĐTM theo ngành × tỉnh (tên cũ và mới); tuyển BQLDA nhà máy mới; `site:` trang đấu thầu (dauthau.asia, bidwinner.info), cổng ĐTM chặn IP nước ngoài, trang mời thầu doanh nghiệp. |
 | LinkedIn X-ray | Google `site:linkedin.com/in "<công ty>" (Giám đốc OR Manager ...)` | ~$0.0045 / công ty | Người ở đúng công ty có cơ hội điểm cao. |
 | LinkedIn (Apify `harvestapi~linkedin-profile-search`, không cookie) | Tìm theo tên công ty (cơ hội điểm cao nhất khi X-ray ít kết quả) và theo chức danh × ngành ở Việt Nam (mỗi tuần 1 lần) | $0.10 / 25 hồ sơ | Không dùng tài khoản LinkedIn của sale. |
@@ -31,7 +31,7 @@ Bình Định bị coi là ngoài vùng).
   thì ăn hết token và trả JSON cụt.
 - Model dự phòng: `LEAD_LLM_MODELS="model1,model2"`. Model đang dùng hết tiền (402) hoặc hết lượt (429) thì tự
   chuyển sang model sau; hết cả danh sách thì dừng gọi LLM và Apify, tin chưa đọc để lần sau.
-- Lô 6 tin, 3 lô song song. JSON lỗi hoặc hết token: chia đôi lô, đọc lại. Tin model bỏ sót: không đánh dấu đã đọc, lần
+- Lô 6 tin, đọc lần lượt từng lô (`LEAD_LLM_WORKERS`, mặc định 1: cổng LLM giữ tiền theo từng request, ví ít tiền mà chạy song song thì bị 402). JSON lỗi hoặc hết token: chia đôi lô, đọc lại. Tin model bỏ sót: không đánh dấu đã đọc, lần
   sau đọc lại. Lỗi 402 (ví hết tiền): dừng mọi lượt gọi LLM còn lại, ghi rõ vào lần quét.
 - Giữ khi: 1 doanh nghiệp / chủ đầu tư cụ thể ở Việt Nam, thuộc 7 ngành, và có tín hiệu mua: mời thầu / chào giá
   **thiết bị**; dự án nhà máy mới (cấp phép, ĐTM, động thổ, khởi công); mở rộng / nâng cấp; tín hiệu khác (tuyển BQLDA,
