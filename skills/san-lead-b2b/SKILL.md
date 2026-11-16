@@ -1,6 +1,6 @@
 ---
 name: san-lead-b2b
-description: Săn lead B2B: quét dự án, mời thầu, tìm người quyết định.
+description: Săn lead B2B (lệnh /tim-lead): quét dự án, mời thầu, tìm người quyết định.
 version: 0.1.0
 author: Agoobi
 license: MIT
@@ -53,7 +53,7 @@ Chạy từ thư mục skill: `python3 -I scripts/lead.py <lệnh>` (chỉ cần
 
 ## Quy trình
 
-**User nói "quét lead", "tìm khách", "có dự án mới không"...**
+**User gõ `/tim-lead`, hoặc nói "tìm lead", "quét lead", "tìm khách", "có dự án mới không"...**
 
 1. `status`. Chưa có key Apify: nói user vào Open WebUI → **Săn lead** → **Cài đặt** → **Key Apify** (lấy ở
    console.apify.com → Settings → API & Integrations), vẫn quét được Google News và trang theo dõi. "Hàng bên bán" trống:
@@ -69,6 +69,21 @@ danh, link LinkedIn, gợi ý tiếp cận). Muốn xem đủ thì mở trang S�
 
 **User muốn thêm nguồn / đổi ngành, vùng, trần chi phí:** hướng dẫn sửa trên trang Săn lead → Cài đặt (Trang theo dõi
 thêm, Từ khoá thiết bị thêm, Ngành, Vùng, Giới hạn và chi phí). Agent không tự sửa.
+
+## Lệnh `/tim-lead` (cài 1 lần)
+
+- **Open WebUI:** Workspace → Prompts có prompt lệnh `tim-lead` (mọi người dùng xem được). Gõ `/tim-lead`, Enter để
+  chọn, Enter để gửi. Nội dung prompt bảo agent làm đúng quy trình trên.
+- **Telegram, Coquifly (gateway Hermes):** thêm alias vào `~/.hermes/config.yaml` rồi khởi động lại gateway:
+
+```yaml
+quick_commands:
+  tim-lead:
+    type: alias
+    target: "/san-lead-b2b Tìm lead ngay: chạy một lần quét mới (start --trigger chat, rồi wait tới khi xong), dán nguyên bảng báo cáo, thêm 2-3 câu nên liên hệ cơ hội nào trước và vì sao."
+```
+
+Cả hai đường đều cần ví LLM của Hermes còn tiền (agent và bước đọc tin đều gọi LLM).
 
 ## Quét tự động mỗi sáng (cài 1 lần)
 
