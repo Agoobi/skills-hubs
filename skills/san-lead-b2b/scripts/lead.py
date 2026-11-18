@@ -147,6 +147,15 @@ WATCH_DEFAULT = [
     {"url": "https://vasep.com.vn/tieu-diem", "label": "VASEP: tiêu điểm", "kind": "assoc"},
     {"url": "https://cucthuy.gov.vn/web/guest/tin-tuyen-dung-dau-thau", "label": "Cục Chăn nuôi và Thú y: đấu thầu", "kind": "assoc"},
     {"url": "https://baodauthau.vn/thong-bao-moi-thau/", "label": "Báo Đấu thầu: thông báo mời thầu", "kind": "tender_board"},
+    # --- don vi cong co phong thi nghiem: thong bao moi chao gia / chao hang canh tranh (thiet bi, vat tu, sua chua)
+    {"url": "https://kiemnghiemhcm.gov.vn/", "label": "TT Kiểm nghiệm TP.HCM: thông báo", "kind": "lab_buyer",
+     "company": "Trung tâm Kiểm nghiệm thuốc, mỹ phẩm, thực phẩm TP. Hồ Chí Minh", "industry": "duoc", "province": "TP. Hồ Chí Minh"},
+    {"url": "https://vienkiemnghiem.gov.vn/", "label": "Viện Kiểm nghiệm thuốc TP.HCM", "kind": "lab_buyer",
+     "company": "Viện Kiểm nghiệm thuốc TP. Hồ Chí Minh", "industry": "duoc", "province": "TP. Hồ Chí Minh"},
+    {"url": "https://ump.edu.vn/thong-tin-dau-thau/thong-bao-moi-chao-gia", "label": "ĐH Y Dược TP.HCM: mời chào giá",
+     "kind": "lab_buyer", "company": "Đại học Y Dược Thành phố Hồ Chí Minh", "industry": "duoc", "province": "TP. Hồ Chí Minh"},
+    {"url": "https://kiemnghiemdanang.vn/", "label": "TT Kiểm nghiệm Đà Nẵng", "kind": "lab_buyer",
+     "company": "Trung tâm Kiểm nghiệm thuốc, mỹ phẩm, thực phẩm Đà Nẵng", "industry": "duoc", "province": "Đà Nẵng"},
     # --- trang moi thau / tin tuc cua doanh nghiep lon
     {"url": "https://dhgpharma.com.vn/vi/thong-bao", "label": "Thông báo DHG Pharma", "kind": "tender",
      "company": "Công ty Cổ phần Dược Hậu Giang", "industry": "duoc", "province": "Cần Thơ"},
@@ -183,6 +192,16 @@ SITE_GROUPS_KCN = [
     ["ipa.khanhhoa.gov.vn", "bqlkkt.gialai.gov.vn", "dav.gov.vn", "bqlkkt.angiang.gov.vn"],
 ]
 # Mua sam cong: muasamcong khong co du lieu mo; doc cac trang tong hop cong khai qua Google
+LAB_BUYER_QUERIES = [
+    '"mời chào giá" ("trung tâm kiểm nghiệm" OR "viện kiểm nghiệm")',
+    '"chào hàng cạnh tranh" "thiết bị" ("kiểm nghiệm" OR "thí nghiệm")',
+    '"mời chào giá" ("chi cục thú y" OR "chẩn đoán thú y" OR "chăn nuôi và thú y")',
+    '"mời chào giá" ("viện nghiên cứu" OR "trường đại học") "thiết bị thí nghiệm"',
+    '"mời báo giá" ("HPLC" OR "sắc ký" OR "quang phổ" OR "tủ an toàn sinh học")',
+    '"mời chào giá" ("chất lượng nông lâm thủy sản" OR "kiểm định" OR "Quatest")',
+    '"mời chào giá" ("hóa chất" OR "vật tư") ("thí nghiệm" OR "kiểm nghiệm")',
+    '"thông báo mời chào giá" ("thủy sản" OR "thức ăn chăn nuôi" OR "dược phẩm" OR "thực phẩm") "thiết bị"',
+]
 SITE_TENDER_PORTALS = ["muasamcong.mof.gov.vn", "dauthau.asia", "bidwinner.info", "baodauthau.vn", "thongtindauthau.com.vn"]
 JOB_SITES = ["jobsgo.vn", "careerviet.vn", "vietnamworks.com", "123job.vn", "topcv.vn", "joboko.com"]
 SITE_GROUPS_TENDER = [
@@ -399,6 +418,17 @@ DATE_PATTERNS = [
     r'itemprop="datePublished"[^>]*content="(\d{4}-\d{2}-\d{2})',
     r'pubdate[^>]*content="(\d{4}-\d{2}-\d{2})',
 ]
+
+
+def text_date(text):
+    """Ngay dd/mm/yyyy (hoac dd-mm-yyyy) trong tieu de / doan trich -> YYYY-MM-DD; khong co thi ""."""
+    m = re.search(r"\b(\d{1,2})[/.-](\d{1,2})[/.-](20\d\d)\b", text or "")
+    if not m:
+        return ""
+    try:
+        return dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1))).isoformat()
+    except ValueError:
+        return ""
 
 
 def page_date(raw):
@@ -662,7 +692,10 @@ VÀ tin cho thấy họ sắp hoặc đang mua thiết bị, theo một trong 4 
              THIẾT BỊ, DÂY CHUYỀN, THIẾT BỊ PHÒNG THÍ NGHIỆM, ĐO LƯỜNG, KIỂM NGHIỆM, HỆ THỐNG ĐÓNG GÓI. Gồm cả gói mua
              thiết bị lab / kiểm nghiệm của viện nghiên cứu, trường đại học, trung tâm kiểm nghiệm, chi cục, cơ quan nhà
              nước thuộc lĩnh vực thủy sản, thú y, chăn nuôi, dược, thực phẩm, nông nghiệp, hóa học (ghi industry là ngành
-             gần nhất trong 7 mã); company = tên đơn vị mời thầu
+             gần nhất trong 7 mã); company = tên đơn vị mời thầu. Cũng là moi_thau: gói bảo dưỡng, sửa chữa, hiệu
+             chuẩn, phụ tùng thiết bị phòng thí nghiệm / kiểm nghiệm (HPLC, sắc ký, quang phổ, tủ an toàn sinh học...),
+             gói hóa chất, vật tư, dụng cụ thí nghiệm. KHÔNG phải: thiết bị y tế khám chữa bệnh của bệnh viện, phòng
+             khám; xây lắp; tư vấn; phần mềm; xe; văn phòng phẩm
   du_an_moi = dự án nhà máy mới: được cấp phép / chấp thuận đầu tư, đang lập ĐTM, động thổ, khởi công, đang xây
   mo_rong = nhà máy đang chạy mở rộng, nâng công suất, thêm dây chuyền, cải tạo, tự động hóa
   tin_hieu = tín hiệu khác: tuyển trưởng ban QLDA / chỉ huy trưởng / kỹ sư cơ điện cho nhà máy mới, phê duyệt ĐTM...
@@ -888,12 +921,14 @@ def build_queries(cfg, limit=None):
 
     kinds = s["kinds"]
     portals = " OR ".join(f"site:{x}" for x in SITE_TENDER_PORTALS)
+    if "moi_thau" in kinds:  # don vi cong mua thiet bi / vat tu / dich vu phong thi nghiem: moi lan quet deu tim
+        queries.extend(LAB_BUYER_QUERIES)
     for n in range(len(groups)):
         g = groups[(turn + n) % len(groups)]
         if "moi_thau" in kinds:
-            queries.append(f'("thư mời chào giá" OR "thư mời báo giá" OR "yêu cầu báo giá" OR "chào giá cạnh tranh") ({ors(g)})')
-            queries.append(f'("thông báo mời thầu" OR "chào hàng cạnh tranh" OR "gói thầu" OR "mua sắm") ({ors(g)})')
-            queries.append(f'({portals}) ({ors(g)})')
+            queries.append(f'("chào giá" OR "báo giá") ({ors(g[:3])})')
+            queries.append(f'("mời thầu" OR "mua sắm" OR "chào hàng cạnh tranh") ({ors(g[2:])})')
+            queries.append(f'({portals}) ({ors(g[:3])})')
     for n, ind in enumerate(order):
         chunk = chunks[(turn + n) % len(chunks)]
         place = f" ({ors(chunk)})" if chunk else ""
@@ -922,7 +957,7 @@ def build_queries(cfg, limit=None):
         queries.append("(" + " OR ".join(f"site:{x}" for x in sites) + ') ("nhà máy" OR "chế biến") ("tác động môi trường" OR "ĐTM" OR "giấy phép môi trường")')
     # xen ke: moi thau, du an, mo rong... de khi cat bot van du loai
     # uu tien moi thau / chao gia: 2 truy van moi thau roi 1 truy van du an
-    tender = [q for q in queries if any(w in q for w in ("chào giá", "mời thầu", "báo giá", "gói thầu")) or
+    tender = [q for q in queries if any(w in q for w in ("chào giá", "mời thầu", "báo giá", "gói thầu", "chào hàng")) or
               any(f"site:{x}" in q for x in SITE_TENDER_PORTALS)]
     rest = [q for q in queries if q not in tender]
     mixed = []
@@ -1038,10 +1073,19 @@ NOT_BUYERS = ["bệnh viện", "phòng khám", "cảng", "điện gió", "điệ
               "truyền tải điện", "điện lực", "bưu điện", "vận tải", "xi măng", "thép"]
 
 
+# goi thau khong phai thiet bi (cong BQL KCN dang rat nhieu): bo tu tieu de, khong ton LLM
+NOT_EQUIPMENT_TENDER = ["tư vấn", "quy hoạch", "khảo sát", "xây lắp", "thi công", "giao thông", "kiểm toán", "giám sát",
+                        "thẩm tra", "lập hồ sơ", "đo đạc", "xây dựng", "san lấp", "bảo hiểm", "sơn tường", "phần mềm"]
+
+
 def _watch_ok(page, title):
     f = fold(title)
     kind = page.get("kind")
+    if kind in ("kcn", "tender", "tender_board", "lab_buyer") and has_any(f, NOT_EQUIPMENT_TENDER):
+        return False
     industry = any(has_any(f, t) for t in INDUSTRY_TERMS.values())
+    if kind == "lab_buyer":  # don vi cong co phong thi nghiem: thong bao moi chao gia / chao hang
+        return has_any(f, ["chào giá", "chào hàng", "mời thầu", "báo giá", "mua sắm"])
     if kind == "tender_board":  # Bao Dau thau: tieu de chi co ten don vi -> giu don vi co the mua thiet bi lab / 7 nganh
         return has_any(f, ["chào giá", "mời thầu", "báo giá", "chào hàng"]) and (industry or has_any(f, LAB_BUYERS))             and not has_any(f, NOT_BUYERS)
     if kind == "tender":
@@ -1104,17 +1148,27 @@ def collect_watch(cfg):
     return items, report
 
 
+TENDER_WORDS = ["mời thầu", "chào giá", "báo giá", "gói thầu", "chào hàng", "mua sắm", "đấu thầu", "TBMT", "chào thầu"]
+LAB_WORDS = ["thí nghiệm", "kiểm nghiệm", "xét nghiệm", "phân tích", "hiệu chuẩn", "kiểm định", "bảo dưỡng", "bảo trì",
+             "sửa chữa thiết bị", "phụ tùng", "linh kiện", "hóa chất", "vật tư", "thiết bị", "máy", "HPLC", "sắc ký",
+             "quang phổ", "vi sinh", "tủ "]
+# trang khong phai thu moi: danh ba nha cung cap, ket qua lua chon nha thau (goi da dong), mang xa hoi
+DROP_URL_PARTS = ("/businesslistings/", "/ketqua", "ketquamothau", "ket-qua-lua-chon", "facebook.com", "/tag/", "/tags/")
+
+
 def prefilter(items):
-    """Bo tin chac chan khong lien quan truoc khi ton LLM: khong co nganh, khong co tin hieu, trang rac."""
+    """Bo tin chac chan khong lien quan truoc khi ton LLM. Thu moi chao gia / moi thau co nhac thiet bi, phong thi nghiem
+    thi luon giu (tieu de thu moi thuong khong ghi nganh: 'Thu moi chao gia may ly tam')."""
     out = []
     for it in items:
         host = urllib.parse.urlsplit(it["url"]).netloc.lower()
-        if any(n in host for n in NOISE_HOSTS):
+        if any(n in host for n in NOISE_HOSTS) or any(p in it["url"].lower() for p in DROP_URL_PARTS):
             continue
         f = fold(f"{it['title']} {it.get('snippet', '')} {it.get('hint', '')}")
         industry = any(has_any(f, terms) for terms in INDUSTRY_TERMS.values())
         signal_hit = has_any(f, SIGNAL_TERMS) or has_any(f, EQUIPMENT_TERMS)
-        if it["origin"] == "Trang theo dõi" or (industry and signal_hit) or "linkedin" in host:
+        tender = has_any(f, TENDER_WORDS) and has_any(f, LAB_WORDS) and not has_any(f, NOT_EQUIPMENT_TENDER)
+        if it["origin"] == "Trang theo dõi" or tender or (industry and signal_hit) or "linkedin" in host:
             out.append(it)
     return out
 
@@ -1140,7 +1194,8 @@ def enrich(items):
 # ---------------------------------------------------------------- lien he doanh nghiep
 
 
-REGISTRY_HOSTS = ("vnr500.vn", "huba.vn", "hosocongty", "vietnamcredit", "kompass", "vietnamdoanhnghiep", "doanhnghiepvn",
+REGISTRY_HOSTS = ("dulieuphapluat.vn", "chogia.vn", "dailychukyso.com.vn", "yp.com.vn", "masocongty", "thongtincongty",
+                  "doanhnghiep.me", "vnr500.vn", "huba.vn", "hosocongty", "vietnamcredit", "kompass", "vietnamdoanhnghiep", "doanhnghiepvn",
                   "masothue.com", "hsctvn.com", "thongtindoanhnghiep.co", "infodoanhnghiep.com", "trangvangvietnam.com",
                   "yellowpages.vn", "doanhnghiep.biz", "tratencongty.com", "vinabiz.org", "thuvienphapluat.vn",
                   "masocongty.vn", "trangthongtin.vn", "dnb.com", "emis.com", "timcongty", "vietnamworks.com",
@@ -1172,6 +1227,26 @@ Tối đa 4 số điện thoại và 4 email, ưu tiên số tổng đài, phòn
 
 def _host(url):
     return urllib.parse.urlsplit(url).netloc.lower().removeprefix("www.")
+
+
+GENERIC_NAME_WORDS = {"dau tu", "nong lam", "xuat nhap khau", "thuong mai", "dich vu", "san xuat", "che bien", "phat trien",
+                      "cong nghe", "ky thuat", "nong nghiep", "cong nghiep", "thuc pham", "thuy san", "xay dung"}
+
+
+def core_name(company):
+    """Phan ten rieng (bo cum chung): 'Dau tu Nong lam Xuat nhap khau Nhat Nhat An' -> 'Nhat Nhat An'. Con < 2 tu thi
+    giu ten ngan (tranh tim theo dia danh)."""
+    short = short_company(company)
+    words = short.split()
+    folded = [fold(w) for w in words]
+    keep = [True] * len(words)
+    for i in range(len(words)):
+        for j in (3, 2):
+            if i + j <= len(words) and " ".join(folded[i:i + j]) in GENERIC_NAME_WORDS:
+                for k in range(i, i + j):
+                    keep[k] = False
+    core = " ".join(w for w, k in zip(words, keep) if k)
+    return core if len(core.split()) >= 2 else short
 
 
 def _distinct_words(company):
@@ -1239,8 +1314,8 @@ def find_contacts(cfg, budget, llm, opps):
     queries = {}
     for o in opps:
         short = short_company(o["company"]) or o["company"]
-        queries[o["id"]] = [f'"{short}" liên hệ điện thoại email', f'"{short}" mã số thuế địa chỉ',
-                            f'site:linkedin.com/company "{short}"']
+        queries[o["id"]] = [f'"{short}" liên hệ điện thoại email', f'"{core_name(o["company"])}" mã số thuế',
+                            f'"{o["company"]}"', f'site:linkedin.com/company "{short}"']
     flat = [q for qs in queries.values() for q in qs]
     results = google_search(budget, flat, after)
     by_query = {}
@@ -1273,8 +1348,14 @@ def find_contacts(cfg, budget, llm, opps):
                 url = f"https://{dom.lower()}/"
                 if _own_site(url, "", o["company"]) and url not in own:
                     own.append(url)
-        registry = [r["url"] for r in res if any(h in _host(r["url"]) for h in REGISTRY_HOSTS)][:2]
-        pages = own[:3] + registry
+        registry = [r["url"] for r in res if any(h in _host(r["url"]) for h in REGISTRY_HOSTS)
+                    and _names_company(f"{r['title']} {r['snippet']}", o["company"])][:3]
+        # trang khac nhac DUNG ten cong ty (thong bao tiep nhan ho so cua so / ban xuc tien, trang danh sach doanh nghiep):
+        # thuong ghi dia chi, dien thoai cua nha dau tu
+        mentions = [r["url"] for r in res if r["url"] not in registry and not _own_site(r["url"], r["title"], o["company"])
+                    and _names_company(f"{r['title']} {r['snippet']}", o["company"])
+                    and not any(n in _host(r["url"]) for n in NOISE_HOSTS)][:3]
+        pages = own[:3] + registry + mentions
         fetched = {}
         with concurrent.futures.ThreadPoolExecutor(6) as pool:
             for u, (raw, final) in zip(pages, pool.map(lambda u: fetch_text(u, timeout=15), pages)):
@@ -1286,9 +1367,19 @@ def find_contacts(cfg, budget, llm, opps):
                 extra.append(page)
         for u in extra[:2]:
             fetched[u] = fetch_text(u, timeout=15)[0]
+        # trang danh sach (tra cuu theo xa...): theo link co ten cong ty sang trang chi tiet
+        for u in registry + mentions:
+            detail = _company_link(fetched.get(u, ""), u, o["company"])
+            if detail and detail not in fetched:
+                fetched[detail] = fetch_text(detail, timeout=15)[0]
         for u, raw in fetched.items():
-            if raw:
-                evidence += _evidence(u, plain_text(raw), raw)
+            if not raw:
+                continue
+            text = plain_text(raw)
+            if u in mentions or _is_listing(text, o["company"]):
+                evidence += _name_evidence(u, text, o["company"])  # chi doan quanh ten cong ty
+            else:
+                evidence += _evidence(u, text, raw)
         evidence = evidence[:40]
         record = {"sources": []}
         if evidence:
@@ -1314,6 +1405,46 @@ def find_contacts(cfg, budget, llm, opps):
             found += 1
         log(f"Liên hệ {o['company'][:50]}: " + ", ".join(got))
     return found
+
+
+def _names_company(text, company):
+    """Doan van co nhac dung cong ty (ten rieng, khong phan biet hoa thuong / dau)."""
+    core = fold(core_name(company))
+    return bool(core) and core in fold(text)
+
+
+def _is_listing(text, company):
+    """Trang liet ke nhieu doanh nghiep (danh sach theo xa, ket qua tim kiem)."""
+    return len(re.findall(r"(?i)c[ôo]ng ty", text)) > 8
+
+
+def _company_link(raw, base, company):
+    """Link co ten cong ty trong trang danh sach -> trang chi tiet cua cong ty do."""
+    core = fold(core_name(company))
+    for m in re.finditer(r'(?is)<a\b[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', raw or ""):
+        label = fold(html.unescape(re.sub(r"<[^>]+>", " ", m.group(2))))
+        href = m.group(1)
+        if core and (core in label or core.replace(" ", "-") in fold(href).replace(" ", "-")):
+            return urllib.parse.urljoin(base, html.unescape(href))
+    return ""
+
+
+def _name_evidence(url, text, company, width=350):
+    """Doan quanh ten cong ty tren trang (dia chi, dien thoai, MST cua chinh cong ty, khong lay cua don vi khac)."""
+    core = fold(core_name(company))
+    folded = fold(text)
+    out = []
+    start = 0
+    while core and len(out) < 3:
+        i = folded.find(core, start)
+        if i < 0:
+            break
+        # vi tri trong text goc ~ vi tri trong ban fold (fold giu do dai tuong doi): lay rong ra
+        ratio = len(text) / max(1, len(folded))
+        a, b = max(0, int(i * ratio) - 80), min(len(text), int(i * ratio) + width)
+        out.append({"url": url, "text": re.sub(r"\s+", " ", text[a:b]).strip()})
+        start = i + len(core)
+    return out
 
 
 def check_contact(picked, evidence, company=""):
@@ -1693,6 +1824,8 @@ def read_items(cfg, items):
                 if not (o.get("published") or it.get("date")) and it.get("origin") != "Trang theo dõi" and o.get("kind") != "moi_thau":
                     verdicts[-1]["verdict"] = "loại: không rõ ngày tin (trang không chính thức, có thể là việc cũ)"
                     continue
+                if not (o.get("published") or it.get("date")):
+                    it["date"] = text_date(f"{it['title']} {it.get('snippet') or ''}")
                 o["sources"] = [{"url": it["url"], "title": it["title"], "published": o.get("published") or it.get("date") or ""}]
                 if not o.get("published"):
                     o["published"] = it.get("date") or ""
