@@ -1233,7 +1233,7 @@ NEWS_HOSTS = ("vnexpress", "tuoitre", "thanhnien", "baodautu", "cafef", "vietnam
               "plo.vn", "sggp", "laodong", "znews", "nhandan", "qdnd", "vov.vn", "vtv.vn", "vietnamplus", "vietstock",
               "dauthau", "bidwinner", "muasamcong", "thesaigontimes", "doanhnhan", "kinhtedothi", "congthuong", "vnbusiness")
 CONTACTS_PER_RUN = int(os.environ.get("LEAD_CONTACTS_PER_RUN") or (25 if FULL else 10))
-CONTACT_RECHECK_DAYS = 14
+CONTACT_RECHECK_DAYS = 3  # chua co SDT / email: 3 ngay sau tim lai (nguon moi, Google lap chi muc them)
 
 CONTACT_SYSTEM = """Bạn xác minh thông tin liên hệ CÔNG KHAI của một doanh nghiệp Việt Nam cho sale B2B.
 Bạn nhận: công ty mục tiêu và các bằng chứng E0, E1... (mỗi bằng chứng: link trang + đoạn văn bản trên trang đó).
@@ -1424,6 +1424,12 @@ def find_contacts(cfg, budget, llm, opps):
                 log(f"Liên hệ {o['company'][:40]}: lỗi đọc ({error})")
                 continue
             record = check_contact(picked if isinstance(picked, dict) else {}, evidence, o["company"])
+        if not record.get("phones") and (record.get("tax_code") or o.get("company_contact", {}).get("tax_code")):
+            extra = phones_by_tax_code(budget, llm, o, record.get("tax_code") or o["company_contact"]["tax_code"], after)
+            if extra:
+                record["phones"] = extra["phones"]
+                record["emails"] = record.get("emails") or extra.get("emails", [])
+                record["sources"] = record.get("sources", []) + [s for s in extra["sources"] if s not in record.get("sources", [])]
         owui("POST", f"/agent/opportunities/{o['id']}/contact", record)
         got = [f"{len(record.get('phones', []))} SĐT", f"{len(record.get('emails', []))} email"]
         if record.get("website"):
@@ -1474,6 +1480,30 @@ def _name_evidence(url, text, company, width=350):
         out.append({"url": url, "text": re.sub(r"\s+", " ", text[a:b]).strip()})
         start = i + len(core)
     return out
+
+
+def phones_by_tax_code(budget, llm, o, tax_code, after):
+    """SDT dang ky theo ma so thue: doan trich Google cua trang tra cuu (masothue, thuvienphapluat...) thuong ghi
+    'Dien thoai: 03...'. Chi doc doan trich (cac trang do chan may chu bang captcha)."""
+    queries = [f'"{tax_code}"', f'"{core_name(o["company"])}" điện thoại']
+    res = google_search(budget, queries, after)
+    evidence = [{"url": r["url"], "text": f"[Google] {r['title']} | {r['snippet']}"[:400]} for r in res
+                if (tax_code in f"{r['title']} {r['snippet']}" or _names_company(f"{r['title']} {r['snippet']}", o["company"]))
+                and PHONE_RE.search(r["snippet"] or "")][:12]
+    if not evidence:
+        return {}
+    lines = [f"E{n}: {e['url']}\n{e['text']}" for n, e in enumerate(evidence)]
+    user = (f"Công ty mục tiêu: {o['company']} (mã số thuế {tax_code})\n"
+            "Chỉ chọn số điện thoại / email ghi cho ĐÚNG công ty có mã số thuế này.\n\n" + "\n\n".join(lines))
+    try:
+        picked = parse_json(llm_chat(llm, CONTACT_SYSTEM, user, max_tokens=900))
+    except WalletEmpty:
+        raise
+    except (ValueError, RuntimeError):
+        return {}
+    picked = picked if isinstance(picked, dict) else {}
+    out = check_contact({"phones": picked.get("phones"), "emails": picked.get("emails")}, evidence, o["company"])
+    return out if out.get("phones") else {}
 
 
 def check_contact(picked, evidence, company=""):
@@ -1543,7 +1573,7 @@ def check_contact(picked, evidence, company=""):
     return out
 
 
-def contact_targets(limit):
+def contact_targets(limit, recheck=True):
     """Co hoi chua co SDT / email (hoac chua tim), diem cao truoc, bo qua thi thoi, moi co hoi tim lai sau 14 ngay."""
     data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"contact": "can_tim", "sort": "score", "limit": 200,
                                                                    "fresh": "1"}))
@@ -1551,7 +1581,7 @@ def contact_targets(limit):
     out = []
     for o in data["items"]:
         checked = (o.get("company_contact") or {}).get("checked_at") or 0
-        if o["state"] == "bo_qua" or now_ts - checked < CONTACT_RECHECK_DAYS * 86400:
+        if o["state"] == "bo_qua" or (recheck and now_ts - checked < CONTACT_RECHECK_DAYS * 86400):
             continue
         out.append(o)
     return out[:limit]
@@ -2162,7 +2192,8 @@ def cmd_people(args):
 def cmd_contacts(args):
     cfg = load_config()
     budget = Budget(cfg)
-    opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(args.limit)
+    opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(
+        args.limit, recheck=not args.all)
     found = find_contacts(cfg, budget, cfg["llm"], opps)
     print(f"Tìm liên hệ cho {len(opps)} cơ hội: {found} có SĐT / email. Chi phí ${budget.spent:.3f}. {budget.stopped}")
 
@@ -2204,6 +2235,7 @@ def main():
     p = sp.add_parser("contacts")
     p.add_argument("--opportunity", default="")
     p.add_argument("--limit", type=int, default=CONTACTS_PER_RUN)
+    p.add_argument("--all", action="store_true", help="tim lai ngay ca co hoi vua tim (bo qua moc 3 ngay)")
     p.set_defaults(f=cmd_contacts)
     sp.add_parser("check-sources").set_defaults(f=cmd_check_sources)
     p = sp.add_parser("collect")
