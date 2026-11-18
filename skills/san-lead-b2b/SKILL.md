@@ -48,6 +48,7 @@ Chạy từ thư mục skill: `python3 -I scripts/lead.py <lệnh>` (chỉ cần
 | --- | --- |
 | `status` | Key Apify, chi phí tháng, LLM, ngành, vùng, nguồn, lần quét gần nhất. Chạy đầu tiên. |
 | `start --trigger chat` | Bắt đầu 1 lần quét **ở nền** (mất 3–10 phút, lâu hơn giới hạn 1 lệnh). In mã lần quét. |
+| `start --full` | Quét đầy đủ: mọi nhóm truy vấn (thiết bị × ngành × tỉnh, ~140 truy vấn Google, chia lô 40) trong 1 lượt, đọc thêm link trang theo dõi, tìm liên hệ cho tối đa 25 cơ hội. Tốn ~$0.6–0.8 Apify; trần 1 lượt nâng lên $1.5, trần tháng giữ nguyên. Dùng lần đầu hoặc khi quét lại từ đầu, không dùng hằng ngày. |
 | `wait <mã>` | Chờ tối đa 170 giây, in tiến độ; xong thì in báo cáo. Chưa xong thì chạy lại `wait <mã>`. |
 | `report [--hours 26]` | Báo cáo cơ hội mới (bảng Markdown) + link trang Săn lead. |
 | `top [--limit 10]` | Cơ hội điểm cao đang ở mục Mới, kèm id. |
