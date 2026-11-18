@@ -8,6 +8,7 @@ http://127.0.0.1:8080/api/v1/cqf/lead.
 
     lead.py status                     key, cai dat, chi phi thang, lan quet gan nhat
     lead.py start [--trigger chat]     chay 1 lan quet o nen, in run id (lan quet dai hon gioi han lenh cua agent)
+    lead.py start --full               quet day du: moi nhom truy van, doc lai nhieu link hon (lan dau / quet lai)
     lead.py wait <run_id>              cho toi 170 giay, in tien do; xong thi in bao cao
     lead.py run [--trigger chat]       chay 1 lan quet ngay trong lenh nay (in tien do + bao cao)
     lead.py report [--hours 26]        bao cao co hoi / nguoi moi tim thay
@@ -51,6 +52,10 @@ ACTOR_LINKEDIN = "harvestapi~linkedin-profile-search"
 PRICE_GOOGLE_PAGE = 0.0045  # tren goi Free; goi tra phi re hon
 PRICE_LINKEDIN_PAGE = 0.10  # 1 trang 25 ho so rut gon
 LLM_BATCH = 6
+FULL = os.environ.get("LEAD_FULL") == "1"  # quet day du: moi nhom truy van trong 1 luot (lan dau / quet lai tu dau)
+FULL_MAX_USD = float(os.environ.get("LEAD_FULL_MAX_USD") or 1.5)  # tran 1 luot quet day du (tran thang van giu)
+APIFY_NOTES = []  # Apify bao het luot / loi: ghi vao lan quet
+LIMITED = set()  # actor Apify da het luot trong lan quet nay: khong goi nua
 LLM_WORKERS = int(os.environ.get("LEAD_LLM_WORKERS") or 1)  # 1: cong LLM giu tien theo tung request dong thoi, vi it tien thi song song bi 402
 FETCH_WORKERS = 8
 TEXT_CHARS = 1800
@@ -162,7 +167,7 @@ WATCH_DEFAULT = [
     {"url": "https://www.greenfeed.com.vn/chuyen-muc/tin-tuc-va-su-kien/", "label": "Tin GreenFeed", "kind": "company",
      "company": "Công ty Cổ phần GreenFeed Việt Nam", "industry": "cam_hoa_chat"},
 ]
-WATCH_FIRST_VISIT = 10  # trang moi them: lan dau chi doc 10 link dau (moi nhat), con lai danh dau da xem
+WATCH_FIRST_VISIT = 30 if FULL else 10  # trang moi them: lan dau chi doc vai link dau (moi nhat)
 # Cong chan IP nuoc ngoai (may chu o Singapore khong mo duoc) hoac chi co file: doc qua Google (site:), khong vuot chan.
 SITE_GROUPS_DTM = [
     ["sonnmt.cantho.gov.vn", "snnmt.tayninh.gov.vn", "snnmt.angiang.gov.vn"],
@@ -448,6 +453,8 @@ class Budget:
         s = cfg["settings"]
         self.key = cfg.get("apify_key") or ""
         self.per_run = float(s.get("max_usd_per_run") or 0)
+        if FULL:
+            self.per_run = max(self.per_run, FULL_MAX_USD)
         self.per_month = float(s.get("max_usd_per_month") or 0)
         self.spent = 0.0
         self.month_used = None
@@ -480,6 +487,8 @@ class Budget:
 
 def apify_run(budget, actor, payload, estimate, what, wait=280):
     """Chay 1 actor, cho xong, tra (items, cost). Khong du ngan sach -> ([], 0)."""
+    if actor in LIMITED:
+        return [], 0.0
     if not budget.allow(estimate, what):
         log(f"Bỏ qua {what}: {budget.stopped}")
         return [], 0.0
@@ -497,14 +506,30 @@ def apify_run(budget, actor, payload, estimate, what, wait=280):
     final = http_json("GET", f"{APIFY}/actor-runs/{run['id']}", headers=headers, timeout=30)["data"]
     cost = float(final.get("usageTotalUsd") or 0)
     budget.spent += cost
+    message = str(final.get("statusMessage") or "")
     if final.get("status") not in ("SUCCEEDED",):
-        log(f"{what}: Apify trạng thái {final.get('status')} ({final.get('statusMessage') or ''})")
+        log(f"{what}: Apify trạng thái {final.get('status')} ({message})")
+    if "limit reached" in message.lower():  # goi Apify mien phi het luot dung actor nay
+        name = "LinkedIn" if actor == ACTOR_LINKEDIN else "Google"
+        note = f"{name} (Apify): gói miễn phí hết lượt dùng ({message}); cần nâng gói Apify để tìm tiếp"
+        LIMITED.add(actor)
+        if note not in APIFY_NOTES:
+            log(note)
+            APIFY_NOTES.append(note)
     return items if isinstance(items, list) else [], cost
+
+
+GOOGLE_BATCH = 40  # moi luot Apify toi da 40 truy van (~3 phut), nhieu hon thi qua thoi gian cho
 
 
 def google_search(budget, queries, after):
     if not queries:
         return []
+    if len(queries) > GOOGLE_BATCH:  # quet day du: chia lo
+        out = []
+        for i in range(0, len(queries), GOOGLE_BATCH):
+            out += google_search(budget, queries[i:i + GOOGLE_BATCH], after)
+        return out
     payload = {"queries": "\n".join(queries), "countryCode": "vn", "languageCode": "vi", "maxPagesPerQuery": 1,
                "resultsPerPage": 10, "afterDate": after}
     items, cost = apify_run(budget, ACTOR_GOOGLE, payload, len(queries) * PRICE_GOOGLE_PAGE, f"{len(queries)} truy vấn Google")
@@ -837,7 +862,18 @@ def province_chunks(cfg):
     return [names[i:i + 7] for i in range(0, len(names), 7)] or [[]]
 
 
-def build_queries(cfg):
+def full_queries(cfg, cap=150):
+    """Moi nhom thiet bi x nganh x nhom tinh trong 1 luot (quet day du)."""
+    s = cfg["settings"]
+    rounds = max(len(EQUIPMENT_GROUPS), len(province_chunks(cfg)), 4)
+    out = {}
+    for _ in range(rounds):
+        for q in build_queries(cfg, limit=10_000):
+            out.setdefault(q, None)
+    return list(out)[:cap]
+
+
+def build_queries(cfg, limit=None):
     s = cfg["settings"]
     industries = [k for k in s["industries"] if k in INDUSTRY_QUERY]
     priority = [k for k in s.get("priority_industries", []) if k in industries]
@@ -896,7 +932,7 @@ def build_queries(cfg):
                 mixed.append(tender.pop(0))
         if rest:
             mixed.append(rest.pop(0))
-    return mixed[: int(s.get("google_queries_per_run") or 0)]
+    return mixed[: limit or int(s.get("google_queries_per_run") or 0)]
 
 
 def news_queries(cfg):
@@ -1112,7 +1148,7 @@ REGISTRY_HOSTS = ("vnr500.vn", "huba.vn", "hosocongty", "vietnamcredit", "kompas
 NEWS_HOSTS = ("vnexpress", "tuoitre", "thanhnien", "baodautu", "cafef", "vietnamnet", "vneconomy", "dantri", "nld.com",
               "plo.vn", "sggp", "laodong", "znews", "nhandan", "qdnd", "vov.vn", "vtv.vn", "vietnamplus", "vietstock",
               "dauthau", "bidwinner", "muasamcong", "thesaigontimes", "doanhnhan", "kinhtedothi", "congthuong", "vnbusiness")
-CONTACTS_PER_RUN = int(os.environ.get("LEAD_CONTACTS_PER_RUN") or 10)
+CONTACTS_PER_RUN = int(os.environ.get("LEAD_CONTACTS_PER_RUN") or (25 if FULL else 10))
 CONTACT_RECHECK_DAYS = 14
 
 CONTACT_SYSTEM = """Bạn xác minh thông tin liên hệ CÔNG KHAI của một doanh nghiệp Việt Nam cho sale B2B.
@@ -1560,7 +1596,7 @@ def gather(cfg, budget, stats, notes, check_seen=True):
         stats["watch_links"] = len(watch)
         items += watch
     if s["sources"].get("google") and cfg.get("apify_key"):
-        queries = build_queries(cfg)
+        queries = full_queries(cfg) if FULL else build_queries(cfg)
         stats["google_queries"] = len(queries)
         after = (today() - dt.timedelta(days=int(s.get("lookback_days") or 45))).isoformat()
         for r in google_search(budget, queries, after):
@@ -1741,6 +1777,7 @@ def run(trigger="chat"):
                 log(f"Không lưu người {r.get('name')}: {r['reason']}")
         if budget.stopped:
             notes.append(budget.stopped)
+        notes.extend(n for n in APIFY_NOTES if n not in notes)
     except Exception as error:  # noqa: BLE001 - ghi vao lan quet roi bao
         status = "error"
         notes.append(str(error)[:400])
@@ -1837,6 +1874,9 @@ def cmd_status(_):
 
 
 def cmd_run(args):
+    if args.full and not FULL:  # chay lai chinh no voi LEAD_FULL=1 (hang so doc luc import)
+        os.execve(sys.executable, [sys.executable, "-I", os.path.abspath(__file__), *sys.argv[1:]],
+                  {**os.environ, "LEAD_FULL": "1"})
     if args.quiet:
         os.makedirs(STATE, exist_ok=True)
         LOG_FILE.append(os.path.join(STATE, f"run-{dt.datetime.now(VN).strftime('%Y%m%d-%H%M%S')}.log"))
@@ -1850,7 +1890,7 @@ def cmd_start(args):
     with open(path, "w", encoding="utf-8") as out:
         proc = subprocess.Popen([sys.executable, "-I", os.path.abspath(__file__), "run", "--trigger", args.trigger],
                                 stdout=out, stderr=subprocess.STDOUT, start_new_session=True, cwd=SKILL,
-                                env={**os.environ, "PYTHONUNBUFFERED": "1"})
+                                env={**os.environ, "PYTHONUNBUFFERED": "1", **({"LEAD_FULL": "1"} if args.full else {})})
     with open(os.path.join(STATE, "last-run.json"), "w", encoding="utf-8") as f:
         json.dump({"pid": proc.pid, "log": path, "started": stamp}, f)
     print(f"Đã bắt đầu lần quét ở nền (mã {stamp}). Chạy: python3 -I scripts/lead.py wait {stamp}")
@@ -1983,6 +2023,7 @@ def main():
         p = sp.add_parser(name)
         p.add_argument("--trigger", default="chat", choices=["chat", "cron", "test"])
         p.add_argument("--quiet", action="store_true", help="tien do ghi vao state/run-*.log, chi in bao cao (cho cron)")
+        p.add_argument("--full", action="store_true", help="quet day du: moi nhom truy van trong 1 luot (ton hon)")
         p.set_defaults(f=fn)
     p = sp.add_parser("wait")
     p.add_argument("run")
