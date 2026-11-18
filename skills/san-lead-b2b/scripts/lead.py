@@ -649,7 +649,9 @@ măng, may mặc, cảng, đường giao thông, bất động sản...); nhà m
 không nêu được tên doanh nghiệp / chủ đầu tư; trang danh sách, trang tìm việc chung, trang giới thiệu dịch vụ;
 trang "dự án đã thực hiện" / "công trình tiêu biểu" của nhà thầu, nhà cung cấp, đơn vị thiết kế (việc đã xong, không
 phải nhu cầu mới); tin chuyển nhượng, mua bán nhà máy; mời thầu đã có kết quả / đã đóng; tin hợp tác, ký kết ghi nhớ
-(MoU), "triển vọng", hội thảo mà không có dự án nhà máy cụ thể (tên, địa điểm, vốn hoặc mốc thời gian).
+(MoU), "triển vọng", hội thảo mà không có dự án nhà máy cụ thể (tên, địa điểm, vốn hoặc mốc thời gian); báo cáo tài
+chính / kết quả kinh doanh, bài phân tích cổ phiếu, bài tổng hợp hay phỏng vấn chỉ NHẮC LẠI việc đã xảy ra từ lâu (VD bài
+tháng 10 kể lễ động thổ tháng 3) mà không có mốc mới (reason "việc cũ"); mời thầu đã quá hạn nộp hồ sơ.
 
 Quy tắc điền:
 - company: tên đầy đủ nhất có trong nguồn (VD "Công ty Cổ phần Dược Hậu Giang"). Nguồn không có tên doanh nghiệp /
@@ -657,7 +659,8 @@ Quy tắc điền:
 - title: tên gói thầu / tên dự án như nguồn. moi_thau bắt buộc có.
 - summary: 1-2 câu tiếng Việt, chỉ sự thật trong nguồn (quy mô, vốn, công suất nếu có).
 - province: tỉnh/thành NƠI ĐẶT nhà máy / dự án chính, viết như nguồn (tên cũ hay mới đều được); tin nhắc nhiều nơi thì
-  lấy nơi đặt nhà máy được nói tới chính, không chọn tỉnh chỉ để lọt vùng. Không rõ thì "". location: KCN/CCN/xã nếu có.
+  lấy nơi đặt nhà máy được nói tới chính, không chọn tỉnh chỉ để lọt vùng. Tên xã / phường / nhà máy giống tên tỉnh
+  (VD xã Khánh An ở Cà Mau, "Minh Phú Hậu Giang") không phải là tỉnh đó. Không rõ thì "". location: KCN/CCN/xã nếu có.
 - equipment: thiết bị nguồn NÊU RÕ (equipment_inferred=false). Nếu nguồn không nêu, suy ra 3-5 hạng mục thiết bị điển
   hình loại nhà máy đó cần, ưu tiên hàng bên bán có, và đặt equipment_inferred=true. Mỗi hạng mục là MỘT thiết bị, tối
   đa 6 từ (VD "Tủ an toàn sinh học", "Máy phân tích NIR"), không gộp nhiều thiết bị, không mở ngoặc liệt kê.
@@ -669,8 +672,12 @@ Quy tắc điền:
   chào giá (tối đa 12).
 - contact: {name, phone, email} của đầu mối / bộ phận nhận hồ sơ, báo giá khi nguồn ghi (xem cả "Dòng liên hệ trong
   trang"). Chép đúng số và email như nguồn; nhiều số thì cách nhau dấu phẩy. Không lấy số của tòa soạn báo, của trang
-  đăng tin hay của nhà cung cấp. Không bịa.
+  đăng tin, của nhà cung cấp, hay của cơ quan nhà nước / ban xúc tiến đầu tư / sở ngành / UBND khi doanh nghiệp là bên
+  khác (để trống). Không bịa.
 - published: ngày đăng tin YYYY-MM-DD nếu biết, không thì "".
+- event_date: ngày (YYYY-MM-DD) hoặc tháng (YYYY-MM) của SỰ KIỆN CHÍNH tin nói tới (khởi công, cấp GCN đầu tư, phê duyệt
+  ĐTM, quyết định mở rộng, ngày phát hành thư mời); nếu tin chỉ nói kế hoạch tương lai thì ghi ngày tin; không rõ thì "".
+  Hệ thống loại tin có sự kiện cũ hơn "Chỉ giữ việc trong" (xem tin nhắn).
 - plant_status: dang_chay | du_an_moi | chua_ro.
 - industry và kind BẮT BUỘC có khi keep=true (dùng đúng mã ở trên). equipment là JSON array các chuỗi.
 - Tỉnh nằm NGOÀI vùng theo dõi (danh sách trong tin nhắn) thì keep=false, reason "ngoài vùng".
@@ -680,7 +687,7 @@ Trả về ĐÚNG MỘT JSON array, mỗi phần tử: {"i": số thứ tự tin
 Không viết gì ngoài JSON."""
 
 
-def extract_batch(llm, seller, batch, region=""):
+def extract_batch(llm, seller, batch, region="", lookback=30):
     lines = []
     for n, c in enumerate(batch):
         lines.append(f"### Tin {n}\nNguồn: {c['url']}\nLoại nguồn: {c['origin']}" + (f" ({c['hint']})" if c.get("hint") else "")
@@ -690,7 +697,8 @@ def extract_batch(llm, seller, batch, region=""):
                      + (f"Dòng liên hệ trong trang:\n{c['contact_hint']}\n" if c.get("contact_hint") else ""))
     user = (f"Bên bán: {seller.get('company') or '(chưa ghi tên)'}\nHàng bên bán có: {seller.get('products') or '(chưa ghi)'}\n"
             f"Không cần tìm: {seller.get('avoid') or '(không)'}\nVùng theo dõi: {region}\n"
-            f"Hôm nay: {today().isoformat()}\n\n" + "\n".join(lines))
+            f"Hôm nay: {today().isoformat()}. Chỉ giữ việc trong {lookback} ngày gần đây (mời thầu: còn hạn).\n\n"
+            + "\n".join(lines))
     try:
         value = parse_json(llm_chat(llm, EXTRACT_SYSTEM, user))
     except WalletEmpty:
@@ -698,8 +706,8 @@ def extract_batch(llm, seller, batch, region=""):
     except (ValueError, Truncated) as error:
         if len(batch) > 1:  # chia doi, doc lai tung nua
             half = len(batch) // 2
-            left = extract_batch(llm, seller, batch[:half], region)
-            right = extract_batch(llm, seller, batch[half:], region)
+            left = extract_batch(llm, seller, batch[:half], region, lookback)
+            right = extract_batch(llm, seller, batch[half:], region, lookback)
             return {**left, **{k + half: v for k, v in right.items()}}
         _save_fail(user, error)
         return {}
@@ -794,7 +802,8 @@ def normalise(o, candidate):
     if contact["name"] and fold(contact["name"]) not in fold(seen_text):
         contact["name"] = ""
     o["contact"] = contact
-    for key in ("title", "summary", "province", "location", "progress", "value", "sales_note", "published", "deadline"):
+    for key in ("title", "summary", "province", "location", "progress", "value", "sales_note", "published", "deadline",
+                "event_date"):
         if o.get(key) is not None and not isinstance(o.get(key), str):
             o[key] = str(o[key])
     return o
@@ -1340,7 +1349,8 @@ def check_contact(picked, evidence, company=""):
 
 def contact_targets(limit):
     """Co hoi chua co SDT / email (hoac chua tim), diem cao truoc, bo qua thi thoi, moi co hoi tim lai sau 14 ngay."""
-    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"contact": "can_tim", "sort": "score", "limit": 200}))
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"contact": "can_tim", "sort": "score", "limit": 200,
+                                                                   "fresh": "1"}))
     now_ts = time.time()
     out = []
     for o in data["items"]:
@@ -1425,7 +1435,7 @@ def _searched(opp_id=None, mark=False):
 
 def people_targets(cfg, limit=8):
     s = cfg["settings"]
-    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"sort": "score", "limit": 200,
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"sort": "score", "limit": 200, "fresh": "1",
                                                                    "min_score": int(s.get("min_score_for_people") or 0)}))
     done = _searched()
     out = []
@@ -1624,7 +1634,7 @@ def read_items(cfg, items):
 
     def read(batch):
         try:
-            return batch, extract_batch(cfg["llm"], s["seller"], batch, region), None
+            return batch, extract_batch(cfg["llm"], s["seller"], batch, region, int(s.get("lookback_days") or 30)), None
         except (RuntimeError, ValueError) as error:
             return batch, {}, error
 
@@ -1773,7 +1783,8 @@ def contact_cell(o):
 
 def report_text(hours=26, run_id=None, stats=None, cost=0.0, status="ok", message=""):
     since = int(time.time() - hours * 3600) if hours else 0
-    opps = owui("GET", "/opportunities?" + urllib.parse.urlencode({"state": "moi", "sort": "score", "limit": 200}))["items"]
+    opps = owui("GET", "/opportunities?" + urllib.parse.urlencode({"state": "moi", "sort": "score", "limit": 200,
+                                                                   "fresh": "1"}))["items"]
     new = [o for o in opps if (o.get("run_id") == run_id if run_id else o["first_seen"] >= since)]
     lines = []
     if stats is not None:
@@ -1920,7 +1931,8 @@ def cmd_report(args):
 
 
 def cmd_top(args):
-    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"state": "moi", "sort": "score", "limit": args.limit}))
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"state": "moi", "sort": "score", "limit": args.limit,
+                                                                   "fresh": "1"}))
     for o in data["items"]:
         print(f"{o['score']:>3} | {o['company']} | {o['kind_label']} | {o['province'] or '?'} | {o['title'][:60]} | id {o['id']}")
     print(f"\nTổng {data['total']} cơ hội ở mục Mới. Trang: {page_url()}")
