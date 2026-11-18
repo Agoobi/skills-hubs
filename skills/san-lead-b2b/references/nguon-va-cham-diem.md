@@ -4,17 +4,27 @@
 
 | Nguồn | Cách lấy | Tiền | Ghi chú |
 | --- | --- | --- | --- |
-| Google News | RSS `news.google.com/rss/search`, 3 truy vấn × mỗi ngành (khởi công / cấp phép / mở rộng), `when:<n>d` | 0 | Chỉ có tiêu đề + tên báo. Tin được giữ thì script tìm **bài gốc** (`site:<báo> "<tiêu đề>"`) và đọc lại toàn văn. |
-| Trang theo dõi | Đọc trang danh sách, lấy link mới có từ khoá phù hợp | 0 | Sẵn: ĐTM Cà Mau, Khánh Hòa; thông báo DHG Pharma, Bidiphar (bỏ ĐTM Đà Nẵng: trang đó là kho lưu trữ cũ). Thêm ở Cài đặt. |
-| Google (Apify `apify~google-search-scraper`) | 18 truy vấn / lần, quay vòng nhóm thiết bị, ngành, tỉnh | ~$0.0045 / truy vấn | Thư mời chào giá theo nhóm thiết bị; khởi công / cấp phép / mở rộng / ĐTM theo ngành × tỉnh (tên cũ và mới); tuyển BQLDA nhà máy mới; `site:` trang đấu thầu (dauthau.asia, bidwinner.info), cổng ĐTM chặn IP nước ngoài, trang mời thầu doanh nghiệp. |
-| LinkedIn X-ray | Google `site:linkedin.com/in "<công ty>" (Giám đốc OR Manager ...)` | ~$0.0045 / công ty | Người ở đúng công ty có cơ hội điểm cao. |
-| LinkedIn (Apify `harvestapi~linkedin-profile-search`, không cookie) | Tìm theo tên công ty (cơ hội điểm cao nhất khi X-ray ít kết quả) và theo chức danh × ngành ở Việt Nam (mỗi tuần 1 lần) | $0.10 / 25 hồ sơ | Không dùng tài khoản LinkedIn của sale. |
+| Google News (hạn chế) | RSS `news.google.com/rss/search`: 2 truy vấn mời chào giá thiết bị + 1 truy vấn dự án nhà máy mỗi ngành, `when:<n>d` | 0 | Chỉ có tiêu đề + tên báo. Tin được giữ thì script tìm **bài gốc** (`site:<báo> "<tiêu đề>"`) và đọc lại toàn văn. Không đọc trang báo địa phương. |
+| Trang theo dõi | Đọc trang danh sách (HTML, RSS), lấy link mới có từ khoá phù hợp; trang mới thêm: lần đầu chỉ đọc 10 link đầu (30 với Báo Đấu thầu) | 0 | ~33 trang: Báo Đấu thầu (thông báo mời thầu, lọc đơn vị thuộc 7 ngành / viện / trường / trung tâm kiểm nghiệm, bỏ bệnh viện, điện, cảng...); BQL KCN / KKT và Xúc tiến đầu tư (Đà Nẵng, Chu Lai, Dung Quất, Gia Lai, Đắk Lắk, Vân Phong, Đồng Nai, Cà Mau, An Giang); mời thầu DHG, Bidiphar, Domesco, Navico; tin Minh Phú, Vĩnh Hoàn, Việt Úc, Masan, GreenFeed; VASEP, Cục Chăn nuôi và Thú y; ĐTM Cà Mau, Khánh Hòa. Thêm ở Cài đặt. `check-sources` để thử. |
+| Google (Apify `apify~google-search-scraper`) | 18 truy vấn / lần, 2/3 là mời thầu / chào giá, quay vòng 8 nhóm thiết bị, ngành, tỉnh | ~$0.0045 / truy vấn | Thư mời chào giá / chào giá cạnh tranh / chào hàng cạnh tranh theo nhóm thiết bị; `site:` muasamcong, dauthau.asia, bidwinner.info, baodauthau.vn, thongtindauthau; khởi công / cấp phép / mở rộng / ĐTM theo ngành × tỉnh; `site:` cổng BQL KCN chặn IP nước ngoài hoặc chạy JavaScript (HEPZA, DSEZA, CEPIZA Cần Thơ, Tây Ninh, Đồng Tháp, Vĩnh Long, Lâm Đồng, IPA Khánh Hòa, IPC Quảng Ngãi, Cục Quản lý Dược); tuyển dụng chỉ huy trưởng / ban QLDA nhà máy mới (jobsgo, careerviet, vietnamworks, 123job, topcv, joboko); trang mời thầu doanh nghiệp. |
+| Liên hệ doanh nghiệp | 3 truy vấn Google / công ty (`"<tên>" liên hệ điện thoại email`, `"<tên>" mã số thuế địa chỉ`, `site:linkedin.com/company "<tên>"`), đọc trang chủ + trang liên hệ của công ty và trang tra cứu doanh nghiệp, LLM chỉ ra giá trị nào của đúng công ty, script kiểm giá trị có trong trang | ~$0.014 / công ty | Website, SĐT (nhãn: tổng đài, mua hàng... ; số từ trang tra cứu ghi "đăng ký kinh doanh"), email, địa chỉ, MST, người đại diện, LinkedIn công ty, fanpage. Mỗi lần quét tối đa 10 cơ hội chưa có SĐT / email (điểm cao trước), tìm lại sau 14 ngày. |
+| LinkedIn X-ray | Google `site:linkedin.com/in "<công ty>"` (cả có và không có chức danh) + tên đầu mối trong nguồn | ~$0.0045 / truy vấn | Cơ hội từ "Chỉ tìm người từ điểm", cả cơ hội cũ còn thiếu người; mỗi cơ hội tìm lại sau 30 ngày. |
+| LinkedIn (Apify `harvestapi~linkedin-profile-search`, không cookie) | Lọc đúng công ty (`currentCompanies` = trang LinkedIn công ty tìm được) + chức danh ra quyết định; không có trang công ty thì tìm theo tên. Tối đa 2 lượt / lần quét. Thêm: theo chức danh × ngành ở Việt Nam (mỗi tuần 1 lần) | $0.10 / 25 hồ sơ | Không dùng tài khoản LinkedIn của sale. |
 
-**Không dùng:** cào trực tiếp muasamcong.mof.gov.vn (trang tìm kiếm cần token chống bot); vượt tường lửa của cổng tỉnh
-chặn IP nước ngoài (Cần Thơ, Tây Ninh, Lâm Đồng... chặn máy chủ ở Singapore) — đọc qua Google `site:` thay vì vào thẳng.
+**Proxy Việt Nam (tuỳ chọn):** nhập ở Săn lead → Cài đặt → Proxy Việt Nam (host:port:user:pass; được kiểm tra, mã hoá,
+không hiện lại). Có proxy thì trang `.gov.vn` đi qua proxy trước (BQL KCN Cần Thơ, Tây Ninh, Đồng Tháp, Vĩnh Long, Lâm Đồng,
+IPA Khánh Hòa, IPC Quảng Ngãi, Gia Lai, Cục Quản lý Dược chặn máy chủ ở nước ngoài), lỗi thì thử đường thẳng; trang khác lỗi
+thì thử lại qua proxy. Dự phòng: env `LEAD_PROXY` hoặc file `state/proxy` (chmod 600). Không có proxy: các cổng đó chỉ đọc
+qua Google `site:`.
 
-Muasamcong không được Google lập chỉ mục tốt; gói thầu nhà nước lấy qua các trang tổng hợp (dauthau.asia, bidwinner.info)
-và tin báo. Muốn đủ gói thầu nhà nước thì cần dịch vụ có API (DauThau.info bản trả phí) — chưa tích hợp.
+**Không dùng:** cào trực tiếp muasamcong.mof.gov.vn (trang tìm kiếm cần token chống bot — proxy không thay đổi điều này,
+không vượt); captcha, đăng nhập, chống bot của bất kỳ trang nào.
+
+Muasamcong không có dữ liệu mở / RSS / API công khai (kiểm 18/11/2026; QĐ 1090/QĐ-BTC chỉ kết nối cơ quan nhà nước) và
+Google lập chỉ mục kém; gói thầu nhà nước lấy qua Báo Đấu thầu (trang theo dõi), các trang tổng hợp (`site:` dauthau.asia,
+bidwinner.info, thongtindauthau) và thư mời trên web doanh nghiệp. Muốn ĐỦ gói thầu nhà nước: API trả phí của DauThau.info
+(VINADES; gói API VIP khoảng 15 triệu đồng / năm + điểm theo bản ghi, 1 IP cố định) hoặc chạy phần thu tin trên máy có IP
+Việt Nam — chưa tích hợp, cần chủ dự án chọn.
 
 ## Tỉnh sau sáp nhập (1/7/2025)
 
