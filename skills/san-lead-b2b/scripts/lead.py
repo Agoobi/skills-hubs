@@ -154,6 +154,11 @@ WATCH_DEFAULT = [
      "company": "Viện Kiểm nghiệm thuốc TP. Hồ Chí Minh", "industry": "duoc", "province": "TP. Hồ Chí Minh"},
     {"url": "https://ump.edu.vn/thong-tin-dau-thau/thong-bao-moi-chao-gia", "label": "ĐH Y Dược TP.HCM: mời chào giá",
      "kind": "lab_buyer", "company": "Đại học Y Dược Thành phố Hồ Chí Minh", "industry": "duoc", "province": "TP. Hồ Chí Minh"},
+    {"url": "https://kiemnghiemgialai.vn/chuyen-muc/mua-sam/thu-moi-bao-gia/", "label": "TT Kiểm nghiệm Gia Lai: thư mời báo giá",
+     "kind": "lab_buyer", "company": "Trung tâm Kiểm nghiệm thuốc, mỹ phẩm, thực phẩm Gia Lai", "industry": "duoc",
+     "province": "Gia Lai"},
+    {"url": "https://sochemvn.com/", "label": "Hóa chất Cơ bản Miền Nam: thư mời chào giá", "kind": "tender",
+     "company": "Công ty Cổ phần Hóa chất Cơ bản Miền Nam", "industry": "cam_hoa_chat", "province": "Đồng Nai"},
     {"url": "https://kiemnghiemdanang.vn/", "label": "TT Kiểm nghiệm Đà Nẵng", "kind": "lab_buyer",
      "company": "Trung tâm Kiểm nghiệm thuốc, mỹ phẩm, thực phẩm Đà Nẵng", "industry": "duoc", "province": "Đà Nẵng"},
     # --- trang moi thau / tin tuc cua doanh nghiep lon
@@ -418,6 +423,22 @@ DATE_PATTERNS = [
     r'itemprop="datePublished"[^>]*content="(\d{4}-\d{2}-\d{2})',
     r'pubdate[^>]*content="(\d{4}-\d{2}-\d{2})',
 ]
+
+
+DEADLINE_RE = re.compile(
+    r"(?i)(hạn cuối|hạn chót|hạn nộp|thời hạn (?:nhận|nộp|gửi)|thời điểm đóng thầu|đóng thầu|hết hạn|trước \d{1,2}\s*(?:h|giờ))"
+    r"[^\n]{0,80}?\b(\d{1,2})[/.-](\d{1,2})[/.-](20\d\d)\b")
+
+
+def deadline_in(text):
+    """Han nop ho so / bao gia ghi trong trang -> YYYY-MM-DD; khong thay thi ""."""
+    m = DEADLINE_RE.search(text or "")
+    if not m:
+        return ""
+    try:
+        return dt.date(int(m.group(4)), int(m.group(3)), int(m.group(2))).isoformat()
+    except ValueError:
+        return ""
 
 
 def text_date(text):
@@ -719,9 +740,11 @@ Quy tắc điền:
 - province: tỉnh/thành NƠI ĐẶT nhà máy / dự án chính, viết như nguồn (tên cũ hay mới đều được); tin nhắc nhiều nơi thì
   lấy nơi đặt nhà máy được nói tới chính, không chọn tỉnh chỉ để lọt vùng. Tên xã / phường / nhà máy giống tên tỉnh
   (VD xã Khánh An ở Cà Mau, "Minh Phú Hậu Giang") không phải là tỉnh đó. Không rõ thì "". location: KCN/CCN/xã nếu có.
-- equipment: thiết bị nguồn NÊU RÕ (equipment_inferred=false). Nếu nguồn không nêu, suy ra 3-5 hạng mục thiết bị điển
-  hình loại nhà máy đó cần, ưu tiên hàng bên bán có, và đặt equipment_inferred=true. Mỗi hạng mục là MỘT thiết bị, tối
-  đa 6 từ (VD "Tủ an toàn sinh học", "Máy phân tích NIR"), không gộp nhiều thiết bị, không mở ngoặc liệt kê.
+- equipment: thiết bị nguồn NÊU RÕ (equipment_inferred=false). Nếu nguồn KHÔNG nêu thiết bị cụ thể ("dây chuyền công
+  nghệ tiên tiến" không tính), chỉ gợi ý tối đa 5 món LẤY TỪ "Hàng bên bán có" mà loại nhà máy đó thật sự cần (phòng
+  QA/QC, kiểm nghiệm), đặt equipment_inferred=true; không liệt kê máy sản xuất (máy nghiền, ép viên, sấy...) nếu bên bán
+  không bán; không chắc thì để []. Mỗi hạng mục là MỘT thiết bị, tối đa 6 từ (VD "Tủ an toàn sinh học", "Máy phân tích
+  NIR"), không gộp nhiều thiết bị, không mở ngoặc liệt kê.
 - deadline: hạn nộp hồ sơ / báo giá YYYY-MM-DD, chỉ khi nguồn ghi. progress: tiến độ CHÉP ĐÚNG mốc thời gian trong
   nguồn ("được cấp phép 9/2026, khởi công quý 1/2027"); không tự suy ra năm hay ngày nguồn không ghi. Với moi_thau,
   progress ghi HÌNH THỨC lựa chọn (chào giá cạnh tranh, chào hàng cạnh tranh, đấu thầu rộng rãi, mua sắm trực tiếp...),
@@ -831,6 +854,8 @@ def normalise(o, candidate):
         equipment = re.split(r"[;,\n]+", equipment)
     o["equipment"] = [str(e).strip() for e in equipment if isinstance(e, (str, int)) and len(str(e).strip()) >= 3][:12]
     o["equipment_inferred"] = bool(o.get("equipment_inferred")) if o["equipment"] else False
+    if o["equipment_inferred"]:
+        o["equipment"] = o["equipment"][:5]
     if o["equipment"] and not o["equipment_inferred"]:
         # model noi "nguon co neu" ma bai khong co thiet bi nao trong danh sach: la goi y
         source = fold(" ".join(str(candidate.get(k) or "") for k in ("title", "snippet", "text")))
@@ -845,6 +870,8 @@ def normalise(o, candidate):
         o["industry"] = m.group(1) if m else o.get("industry")
     if o.get("kind") not in KIND_KEYS and candidate.get("origin") == "Trang theo dõi" and "mời thầu" in hint.lower():
         o["kind"] = "moi_thau"
+    if o.get("kind") == "moi_thau" and not o.get("deadline") and candidate.get("deadline_hint"):
+        o["deadline"] = candidate["deadline_hint"]  # model sot dong han cuoi
     if not o.get("province") and candidate.get("province"):
         o["province"] = candidate["province"]
     if not o.get("company") and candidate.get("company"):
@@ -1182,7 +1209,9 @@ def enrich(items):
             raw, _ = fetch_text(it["url"])
             if raw:
                 it["text"] = main_text(raw)
-                it["contact_hint"] = contact_lines(plain_text(raw))
+                full = plain_text(raw)
+                it["contact_hint"] = contact_lines(full)
+                it["deadline_hint"] = deadline_in(full)
                 it["date"] = it.get("date") or page_date(raw)
         except Exception as error:  # noqa: BLE001 - 1 trang loi khong lam hong ca lan quet
             log(f"Không đọc được {it['url'][:80]}: {error}")
