@@ -13,6 +13,7 @@ http://127.0.0.1:8080/api/v1/cqf/lead.
     lead.py report [--hours 26]        bao cao co hoi / nguoi moi tim thay
     lead.py top [--limit 10]           co hoi diem cao dang o trang thai Moi
     lead.py people --opportunity <id>  tim nguoi ra quyet dinh cho 1 co hoi
+    lead.py contacts [--limit 10]      tim website, SDT, email, MST, LinkedIn cong ty cho co hoi chua co lien he
     lead.py check-sources              thu tung trang theo doi (doc duoc khong, bao nhieu link)
 """
 
@@ -210,6 +211,42 @@ def strip_html(raw):
     text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
     lines = [re.sub(r"[ \t ]+", " ", line).strip() for line in text.splitlines()]
     return "\n".join(line for line in lines if len(line) > 1)
+
+
+def plain_text(raw):
+    """Toan bo chu cua trang, giu header / footer (noi hay ghi dia chi, SDT, email)."""
+    raw = re.sub(r"(?is)<(script|style|noscript|svg|iframe)\b.*?</\1>", " ", raw)
+    raw = re.sub(r"(?is)<br\s*/?>|</p>|</div>|</li>|</h\d>|</tr>|</td>", "\n", raw)
+    text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw))
+    lines = [re.sub(r"[ \t\u00a0]+", " ", line).strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if len(line) > 1)
+
+
+PHONE_RE = re.compile(r"(?<![\d.,])(?:\(?\+?84\)?[\s.\-]?\(?0?\)?|\(?0)(?:\d[\s.\-)]{0,2}){8,10}(?![\d])"
+                      r"|(?<![\d.,])(?:1800[\s.\-]?\d{2}[\s.\-]?\d{2}|1900[\s.\-]?\d{2,3}[\s.\-]?\d{2,3})(?![\d])")
+EMAIL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+CONTACT_WORDS = ("liên hệ", "điện thoại", "đt:", "đt :", "tel", "hotline", "email", "e-mail", "fax", "di động", "zalo")
+
+
+def contact_lines(text, limit=700):
+    """Dong co SDT / email / 'lien he' trong trang (thu moi chao gia ghi dau moi o cuoi, hay bi cat)."""
+    out, used = [], 0
+    for line in text.splitlines():
+        low = line.lower()
+        if PHONE_RE.search(line) or EMAIL_RE.search(line) or any(w in low for w in CONTACT_WORDS):
+            line = line[:220]
+            if used + len(line) > limit:
+                break
+            out.append(line)
+            used += len(line) + 1
+    return "\n".join(out)
+
+
+def phone_digits(value):
+    d = re.sub(r"\D", "", str(value or ""))
+    if d.startswith("84") and len(d) in (11, 12):
+        d = "0" + d[2:]
+    return d
 
 
 def main_text(raw):
@@ -492,7 +529,9 @@ Quy tắc điền:
 - deadline: hạn nộp hồ sơ / báo giá YYYY-MM-DD, chỉ khi nguồn ghi. progress: tiến độ CHÉP ĐÚNG mốc thời gian trong
   nguồn ("được cấp phép 9/2026, khởi công quý 1/2027"); không tự suy ra năm hay ngày nguồn không ghi. value: chỉ số
   tiền (vốn đầu tư / giá gói, VD "1.250 tỷ đồng"); không có số tiền thì "".
-- contact: {name, phone, email} chỉ khi nguồn ghi (đầu mối của đơn vị). Không bịa.
+- contact: {name, phone, email} của đầu mối / bộ phận nhận hồ sơ, báo giá khi nguồn ghi (xem cả "Dòng liên hệ trong
+  trang"). Chép đúng số và email như nguồn; nhiều số thì cách nhau dấu phẩy. Không lấy số của tòa soạn báo, của trang
+  đăng tin hay của nhà cung cấp. Không bịa.
 - published: ngày đăng tin YYYY-MM-DD nếu biết, không thì "".
 - plant_status: dang_chay | du_an_moi | chua_ro.
 - industry và kind BẮT BUỘC có khi keep=true (dùng đúng mã ở trên). equipment là JSON array các chuỗi.
@@ -509,7 +548,8 @@ def extract_batch(llm, seller, batch, region=""):
         lines.append(f"### Tin {n}\nNguồn: {c['url']}\nLoại nguồn: {c['origin']}" + (f" ({c['hint']})" if c.get("hint") else "")
                      + f"\nNgày (nếu biết): {c.get('date') or 'không rõ'}\nTiêu đề: {c['title']}\n"
                      + (f"Đoạn trích: {c['snippet']}\n" if c.get("snippet") else "")
-                     + (f"Nội dung trang:\n{c['text'][:TEXT_CHARS]}\n" if c.get("text") else ""))
+                     + (f"Nội dung trang:\n{c['text'][:TEXT_CHARS]}\n" if c.get("text") else "")
+                     + (f"Dòng liên hệ trong trang:\n{c['contact_hint']}\n" if c.get("contact_hint") else ""))
     user = (f"Bên bán: {seller.get('company') or '(chưa ghi tên)'}\nHàng bên bán có: {seller.get('products') or '(chưa ghi)'}\n"
             f"Không cần tìm: {seller.get('avoid') or '(không)'}\nVùng theo dõi: {region}\n"
             f"Hôm nay: {today().isoformat()}\n\n" + "\n".join(lines))
@@ -605,7 +645,16 @@ def normalise(o, candidate):
     if not o.get("company") and candidate.get("company"):
         o["company"] = candidate["company"]
     contact = o.get("contact") if isinstance(o.get("contact"), dict) else {}
-    o["contact"] = {k: str(contact.get(k) or "").strip() for k in ("name", "phone", "email")}
+    contact = {k: str(contact.get(k) or "").strip() for k in ("name", "phone", "email")}
+    seen_text = " ".join(str(candidate.get(k) or "") for k in ("title", "snippet", "text", "contact_hint"))
+    seen_digits = {phone_digits(m.group(0)) for m in PHONE_RE.finditer(seen_text)}
+    phones = [p.strip() for p in re.split(r"[,;/]", contact["phone"]) if p.strip()]
+    contact["phone"] = ", ".join(p for p in phones if phone_digits(p) in seen_digits)  # so khong co trong nguon: bo
+    if contact["email"] and contact["email"].lower() not in seen_text.lower():
+        contact["email"] = ""
+    if contact["name"] and fold(contact["name"]) not in fold(seen_text):
+        contact["name"] = ""
+    o["contact"] = contact
     for key in ("title", "summary", "province", "location", "progress", "value", "sales_note", "published", "deadline"):
         if o.get(key) is not None and not isinstance(o.get(key), str):
             o[key] = str(o[key])
@@ -811,12 +860,258 @@ def enrich(items):
             raw, _ = fetch_text(it["url"])
             if raw:
                 it["text"] = main_text(raw)
+                it["contact_hint"] = contact_lines(plain_text(raw))
                 it["date"] = it.get("date") or page_date(raw)
         except Exception as error:  # noqa: BLE001 - 1 trang loi khong lam hong ca lan quet
             log(f"Không đọc được {it['url'][:80]}: {error}")
         return it
     with concurrent.futures.ThreadPoolExecutor(FETCH_WORKERS) as pool:
         return list(pool.map(one, items))
+
+
+# ---------------------------------------------------------------- lien he doanh nghiep
+
+
+REGISTRY_HOSTS = ("masothue.com", "hsctvn.com", "thongtindoanhnghiep.co", "infodoanhnghiep.com", "trangvangvietnam.com",
+                  "yellowpages.vn", "doanhnghiep.biz", "tratencongty.com", "vinabiz.org", "thuvienphapluat.vn",
+                  "masocongty.vn", "trangthongtin.vn", "dnb.com", "emis.com", "timcongty", "vietnamworks.com",
+                  "topcv.vn", "careerviet.vn", "itviec.com", "congty.vn", "doanhnghiepmoi.vn")
+NEWS_HOSTS = ("vnexpress", "tuoitre", "thanhnien", "baodautu", "cafef", "vietnamnet", "vneconomy", "dantri", "nld.com",
+              "plo.vn", "sggp", "laodong", "znews", "nhandan", "qdnd", "vov.vn", "vtv.vn", "vietnamplus", "vietstock",
+              "dauthau", "bidwinner", "muasamcong", "thesaigontimes", "doanhnhan", "kinhtedothi", "congthuong", "vnbusiness")
+CONTACTS_PER_RUN = int(os.environ.get("LEAD_CONTACTS_PER_RUN") or 10)
+CONTACT_RECHECK_DAYS = 14
+
+CONTACT_SYSTEM = """Bạn xác minh thông tin liên hệ CÔNG KHAI của một doanh nghiệp Việt Nam cho sale B2B.
+Bạn nhận: công ty mục tiêu và các bằng chứng E0, E1... (mỗi bằng chứng: link trang + đoạn văn bản trên trang đó).
+Chỉ chọn thông tin THUỘC CHÍNH công ty mục tiêu (cùng tên hoặc thương hiệu; trụ sở, chi nhánh, nhà máy của công ty đó
+đều được). LOẠI: số / email của trang tra cứu, báo chí, sàn việc làm, nhà cung cấp, đối tác, cơ quan nhà nước; công ty
+khác trùng tên một phần; số fax; số trong quảng cáo. Không chắc thì bỏ.
+CHÉP ĐÚNG giá trị như trong bằng chứng, không sửa, không đoán, không ghép số.
+Trả về ĐÚNG MỘT JSON object:
+{"website": {"e": số} hoặc null  (bằng chứng là trang web CHÍNH THỨC của công ty mục tiêu),
+ "phones": [{"e": số, "value": "số như bằng chứng", "label": "Tổng đài / Phòng kinh doanh / Mua hàng / Nhà máy ..."}],
+ "emails": [{"e": số, "value": "email", "label": ""}],
+ "address": {"e": số, "value": "địa chỉ trụ sở hoặc nhà máy"} hoặc null,
+ "tax_code": {"e": số, "value": "mã số thuế"} hoặc null,
+ "representative": {"e": số, "value": "người đại diện pháp luật"} hoặc null,
+ "linkedin_company": {"e": số} hoặc null  (trang linkedin.com/company của đúng công ty),
+ "facebook": {"e": số} hoặc null  (fanpage chính thức),
+ "reason": "1 câu"}
+Tối đa 4 số điện thoại và 4 email, ưu tiên số tổng đài, phòng kinh doanh, mua hàng, kỹ thuật. Không viết gì ngoài JSON."""
+
+
+def _host(url):
+    return urllib.parse.urlsplit(url).netloc.lower().removeprefix("www.")
+
+
+def _distinct_words(company):
+    """Tu rieng cua ten cong ty (bo tu chung, dia danh) + chu viet tat (Duoc Hau Giang -> dhg)."""
+    words = fold(short_company(company)).split()
+    common = {"thuc", "pham", "duoc", "thuy", "san", "che", "bien", "xuat", "nhap", "khau", "dau", "tu", "phat", "trien",
+              "thuong", "mai", "dich", "vu", "san", "xuat", "cong", "nghe", "sinh", "hoc", "hoa", "chat", "chan", "nuoi",
+              "thuc", "an", "my", "va", "nong", "lam", "tap", "doan", "group", "food", "foods", "seafood", "pharma",
+              "viet", "nam", "sai", "gon", "mien", "nam", "bac", "trung", "quoc", "te", "do", "uong", "sua", "ky", "nghe"}
+    distinct = [w for w in words if len(w) >= 3 and w not in common]
+    if len(words) >= 2:
+        distinct.append("".join(w[0] for w in words if w))
+    return [w for w in distinct if len(w) >= 3]
+
+
+def _own_site(url, title, company):
+    host = _host(url)
+    if not host or any(h in host for h in REGISTRY_HOSTS + NEWS_HOSTS + NOISE_HOSTS) or host.endswith("gov.vn") \
+            or any(h in host for h in ("linkedin.", "facebook.", "google.", "youtube.", "zalo.")) or host.startswith("bao"):
+        return False
+    label = host.split(".")[0].replace("-", "")
+    words = _distinct_words(company)
+    return any(w in label for w in words) or (fold(short_company(company)) in fold(title) and len(host.split(".")) <= 4)
+
+
+def _contact_page(raw, base):
+    for m in re.finditer(r"""href=["']([^"'#]+)["']""", raw or ""):
+        href = m.group(1)
+        if re.search(r"(?i)lien[-_]?he|contact|lienhe", href):
+            return urllib.parse.urljoin(base, href)
+    return ""
+
+
+def _evidence(url, text, raw=""):
+    """Doan van ban quanh moi SDT / email / dia chi / MST tren trang."""
+    out = []
+    hits = []
+    for m in PHONE_RE.finditer(text):
+        hits.append((m.start(), m.end()))
+    for m in EMAIL_RE.finditer(text):
+        hits.append((m.start(), m.end()))
+    for m in re.finditer(r"(?i)(địa chỉ|trụ sở|address|mã số thuế|mst|người đại diện|đại diện pháp luật)", text):
+        hits.append((m.start(), m.end() + 120))
+    hits.sort()
+    last_end = -1
+    for start, end in hits:
+        if start < last_end:
+            continue
+        a, b = max(0, start - 90), min(len(text), end + 60)
+        out.append({"url": url, "text": re.sub(r"\s+", " ", text[a:b]).strip()})
+        last_end = b
+        if len(out) >= 10:
+            break
+    mails = set(re.findall(r"(?i)mailto:([^\"'?\s>]+)", raw or "")) | set(re.findall(r"(?i)tel:([+\d][\d\s.\-()]{7,})", raw or ""))
+    for m in sorted(mails)[:4]:
+        out.append({"url": url, "text": f"liên kết trên trang: {m}"})
+    return out
+
+
+def find_contacts(cfg, budget, llm, opps):
+    """Website, SDT, email, MST, LinkedIn cong ty cua tung co hoi. Moi gia tri phai co trong 1 trang nguon."""
+    if not opps or not cfg.get("apify_key"):
+        return 0
+    after = (today() - dt.timedelta(days=3650)).isoformat()
+    queries = {}
+    for o in opps:
+        short = short_company(o["company"]) or o["company"]
+        name = o["company"] if len(o["company"]) <= 70 else short
+        queries[o["id"]] = [f'"{name}" điện thoại email', f'"{short}" mã số thuế địa chỉ',
+                            f'site:linkedin.com/company "{short}"']
+    flat = [q for qs in queries.values() for q in qs]
+    results = google_search(budget, flat, after)
+    by_query = {}
+    for r in results:
+        by_query.setdefault(r["query"], []).append(r)
+    found = 0
+    for o in opps:
+        qs = queries[o["id"]]
+        res = [r for q in qs for r in by_query.get(q, [])]
+        if not res and budget.stopped:
+            break
+        evidence = []
+        # ket qua Google: doan trich (trang tra cuu doanh nghiep hay co MST, dia chi, SDT)
+        for r in res[:24]:
+            host = _host(r["url"])
+            if "linkedin.com/company/" in r["url"] or "facebook.com" in host or any(h in host for h in REGISTRY_HOSTS) \
+                    or _own_site(r["url"], r["title"], o["company"]):
+                evidence.append({"url": r["url"], "text": f"[Google] {r['title']} | {r['snippet']}"[:400]})
+        # doc trang chinh thuc (trang chu + trang lien he) va trang tra cuu
+        own = []
+        for r in res:
+            if _own_site(r["url"], r["title"], o["company"]):
+                root = f"{urllib.parse.urlsplit(r['url']).scheme}://{urllib.parse.urlsplit(r['url']).netloc}/"
+                for u in (r["url"], root):
+                    if u not in own:
+                        own.append(u)
+        registry = [r["url"] for r in res if any(h in _host(r["url"]) for h in REGISTRY_HOSTS)][:2]
+        pages = own[:3] + registry
+        fetched = {}
+        with concurrent.futures.ThreadPoolExecutor(6) as pool:
+            for u, (raw, final) in zip(pages, pool.map(lambda u: fetch_text(u, timeout=15), pages)):
+                fetched[u] = raw
+        extra = []
+        for u in own[:3]:
+            page = _contact_page(fetched.get(u, ""), u)
+            if page and page not in fetched and page not in extra:
+                extra.append(page)
+        for u in extra[:2]:
+            fetched[u] = fetch_text(u, timeout=15)[0]
+        for u, raw in fetched.items():
+            if raw:
+                evidence += _evidence(u, plain_text(raw), raw)
+        evidence = evidence[:40]
+        record = {"sources": []}
+        if evidence:
+            lines = [f"E{n}: {e['url']}\n{e['text']}" for n, e in enumerate(evidence)]
+            user = (f"Công ty mục tiêu: {o['company']}\nNgành: {o.get('industry_label') or o['industry']}; tỉnh: "
+                    f"{o.get('province') or '?'}; địa điểm: {o.get('location') or '?'}\nCơ hội: {o.get('title') or ''}\n\n"
+                    + "\n\n".join(lines))
+            try:
+                picked = parse_json(llm_chat(llm, CONTACT_SYSTEM, user, max_tokens=1800))
+            except WalletEmpty:
+                raise
+            except (ValueError, RuntimeError) as error:
+                log(f"Liên hệ {o['company'][:40]}: lỗi đọc ({error})")
+                continue
+            record = check_contact(picked if isinstance(picked, dict) else {}, evidence)
+        owui("POST", f"/agent/opportunities/{o['id']}/contact", record)
+        got = [f"{len(record.get('phones', []))} SĐT", f"{len(record.get('emails', []))} email"]
+        if record.get("website"):
+            got.append("website")
+        if record.get("linkedin_company"):
+            got.append("LinkedIn")
+        if record.get("phones") or record.get("emails"):
+            found += 1
+        log(f"Liên hệ {o['company'][:50]}: " + ", ".join(got))
+    return found
+
+
+def check_contact(picked, evidence):
+    """Chi giu gia tri co that trong bang chung model chi ra (chong bia)."""
+    def ev(item):
+        if isinstance(item, dict) and isinstance(item.get("e"), int) and 0 <= item["e"] < len(evidence):
+            return evidence[item["e"]]
+        return None
+
+    used = []
+    out = {"phones": [], "emails": []}
+    for item in (picked.get("phones") or [])[:6]:
+        e = ev(item)
+        if not e:
+            continue
+        digits = phone_digits(item.get("value"))
+        ok = False
+        for m in PHONE_RE.finditer(e["text"]):
+            if phone_digits(m.group(0)) != digits:
+                continue
+            before = fold(re.split(r"\d", e["text"][max(0, m.start() - 28):m.start()])[-1])  # chu ngay truoc so nay
+            if not re.search(r"\b(fax|ma so thue|mst|tax|so dkkd|giay phep)\b", before):  # MST / fax giong SDT
+                ok = True
+        if len(digits) >= 8 and ok:
+            out["phones"].append({"value": item["value"], "label": str(item.get("label") or "")[:60], "url": e["url"]})
+            used.append(e["url"])
+    for item in (picked.get("emails") or [])[:6]:
+        e = ev(item)
+        value = str((item or {}).get("value") or "").strip().lower()
+        if e and value and value in e["text"].lower():
+            out["emails"].append({"value": value, "label": str(item.get("label") or "")[:60], "url": e["url"]})
+            used.append(e["url"])
+    for key in ("address", "tax_code", "representative"):
+        item = picked.get(key)
+        e = ev(item)
+        value = str((item or {}).get("value") or "").strip()
+        ok = e and value and (re.sub(r"\D", "", value) in re.sub(r"\D", "", e["text"]) if key == "tax_code"
+                              else fold(value) in fold(e["text"]))
+        if ok:
+            out[key] = value
+            used.append(e["url"])
+    for key in ("website", "linkedin_company", "facebook"):
+        e = ev(picked.get(key))
+        if not e:
+            continue
+        url = e["url"]
+        if key == "website":
+            parts = urllib.parse.urlsplit(url)
+            if any(h in _host(url) for h in REGISTRY_HOSTS + NEWS_HOSTS) or "linkedin." in url or "facebook." in url:
+                continue
+            url = f"{parts.scheme}://{parts.netloc}/"
+        elif key == "linkedin_company" and "linkedin.com/company/" not in url:
+            continue
+        elif key == "facebook" and "facebook.com" not in url:
+            continue
+        out[key] = url
+        used.append(e["url"])
+    out["sources"] = [{"url": u} for u in dict.fromkeys(used)]
+    return out
+
+
+def contact_targets(limit):
+    """Co hoi chua co SDT / email (hoac chua tim), diem cao truoc, bo qua thi thoi, moi co hoi tim lai sau 14 ngay."""
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"contact": "can_tim", "sort": "score", "limit": 200}))
+    now_ts = time.time()
+    out = []
+    for o in data["items"]:
+        checked = (o.get("company_contact") or {}).get("checked_at") or 0
+        if o["state"] == "bo_qua" or now_ts - checked < CONTACT_RECHECK_DAYS * 86400:
+            continue
+        out.append(o)
+    return out[:limit]
 
 
 # ---------------------------------------------------------------- nguoi lien he
@@ -868,24 +1163,80 @@ def linkedin_search(budget, payload, what):
     return out
 
 
+DECISION_TITLES = ["Director", "Giám đốc", "Plant Manager", "Factory Manager", "Production Manager", "Technical Manager",
+                   "Engineering Manager", "Maintenance Manager", "Project Manager", "QA Manager", "QC Manager",
+                   "R&D Manager", "Purchasing Manager", "Procurement Manager", "Trưởng phòng", "Head of"]
+LINKEDIN_SEARCHES_PER_RUN = int(os.environ.get("LEAD_LINKEDIN_SEARCHES_PER_RUN") or 2)
+PEOPLE_RECHECK_DAYS = 30
+
+
+def _searched(opp_id=None, mark=False):
+    """Co hoi da tim nguoi gan day (khong ton tien tim lai trong 30 ngay)."""
+    path = os.path.join(STATE, "people-searched.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = {}
+    if mark and opp_id:
+        data[opp_id] = time.time()
+        os.makedirs(STATE, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    return data
+
+
+def people_targets(cfg, limit=8):
+    s = cfg["settings"]
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"sort": "score", "limit": 200,
+                                                                   "min_score": int(s.get("min_score_for_people") or 0)}))
+    done = _searched()
+    out = []
+    for o in data["items"]:
+        if o["state"] == "bo_qua" or o["people_count"] >= int(s.get("people_per_opportunity") or 4):
+            continue
+        if time.time() - done.get(o["id"], 0) < PEOPLE_RECHECK_DAYS * 86400:
+            continue
+        out.append(o)
+    return out[:limit]
+
+
 def people_for(cfg, budget, llm, opps):
-    """Nguoi ra quyet dinh cho cac co hoi: Google X-ray (re) truoc, LinkedIn search cho co hoi diem cao nhat neu it ket qua."""
+    """Nguoi ra quyet dinh cho cac co hoi: Google X-ray (re, ca ten dau moi trong nguon), roi LinkedIn loc dung cong ty
+    (trang LinkedIn cong ty tim duoc o buoc lien he) cho vai co hoi diem cao con it ket qua."""
     s = cfg["settings"]
     if not opps or not s["sources"].get("linkedin"):
         return []
     after = (today() - dt.timedelta(days=3650)).isoformat()
-    queries = [f'site:linkedin.com/in "{short_company(o["company"])}" {TITLE_OR}' for o in opps]
-    results = google_search(budget, queries, after)
+    queries = {}
+    for o in opps:
+        short = short_company(o["company"])
+        qs = [f'site:linkedin.com/in "{short}"', f'site:linkedin.com/in "{short}" {TITLE_OR}']
+        lead_name = re.sub(r"(?i)^(ông|bà|anh|chị|mr\.?|ms\.?)\s+", "", (o.get("contact") or {}).get("name", "")).strip()
+        if lead_name:
+            qs.append(f'site:linkedin.com/in "{lead_name}"')
+        queries[o["id"]] = qs
+    results = google_search(budget, [q for qs in queries.values() for q in qs], after)
     by_query = {}
     for r in results:
         by_query.setdefault(r["query"], []).append(r)
     found = []
-    for o, q in zip(opps, queries):
-        profiles = parse_xray(by_query.get(q, []))
-        if len(profiles) < 2 and o is opps[0] and budget.allow(PRICE_LINKEDIN_PAGE, "tìm LinkedIn"):
-            profiles += linkedin_search(budget, {"profileScraperMode": "Short", "searchQuery": short_company(o["company"]),
-                                                  "locations": ["Vietnam"], "takePages": 1, "maxItems": 25},
-                                         f"LinkedIn: {short_company(o['company'])}")
+    searches = 0
+    for o in opps:
+        profiles = []
+        for q in queries[o["id"]]:
+            profiles += [p for p in parse_xray(by_query.get(q, [])) if p["linkedin_url"] not in {x["linkedin_url"] for x in profiles}]
+        company_page = (o.get("company_contact") or {}).get("linkedin_company")
+        if len(profiles) < 3 and searches < LINKEDIN_SEARCHES_PER_RUN and budget.allow(PRICE_LINKEDIN_PAGE, "tìm LinkedIn"):
+            payload = {"profileScraperMode": "Short", "locations": ["Vietnam"], "takePages": 1, "maxItems": 25}
+            if company_page:  # dung cong ty: chinh xac nhat
+                payload.update({"currentCompanies": [company_page], "currentJobTitles": DECISION_TITLES})
+            else:
+                payload["searchQuery"] = short_company(o["company"])
+            profiles += linkedin_search(budget, payload, f"LinkedIn: {short_company(o['company'])}"
+                                        + (" (đúng trang công ty)" if company_page else ""))
+            searches += 1
+        _searched(o["id"], mark=True)
         if not profiles:
             continue
         context = (f"Công ty mục tiêu: {o['company']} ({o.get('industry_label') or o['industry']}, {o.get('province') or ''}).\n"
@@ -1080,7 +1431,7 @@ def run(trigger="chat"):
     log(f"Bắt đầu lần quét {run_id} ({trigger}). Nguồn: " + ", ".join(k for k, v in s["sources"].items() if v))
     budget = Budget(cfg)
     stats = {"candidates": 0, "created": 0, "merged": 0, "rejected": 0, "people_created": 0, "people_merged": 0,
-             "google_queries": 0, "news_items": 0, "watch_links": 0}
+             "google_queries": 0, "news_items": 0, "watch_links": 0, "contacts_found": 0}
     notes = []
     status = "ok"
     try:
@@ -1122,17 +1473,14 @@ def run(trigger="chat"):
                 if v["url"] == src:
                     v["verdict"] = f"loại khi lưu: {r['reason']}"
         owui("POST", "/agent/seen", {"items": verdicts})
-        # nguoi lien he cho co hoi tot vua tim / vua gap lai
-        touched = [x["id"] for x in saved["created"] + saved["merged"]]
-        targets = []
-        for opp_id in touched:
-            o = owui("GET", f"/opportunities/{opp_id}")
-            if o["score"] >= int(s.get("min_score_for_people") or 0) and o["people_count"] < int(s.get("people_per_opportunity") or 0):
-                targets.append(o)
-        targets.sort(key=lambda o: -o["score"])
+        # lien he doanh nghiep (website, SDT, email, MST, LinkedIn) cho moi co hoi chua co, diem cao truoc
+        if cfg.get("apify_key") and not _wallet_empty and not budget.stopped:
+            stats["contacts_found"] = find_contacts(cfg, budget, cfg["llm"], contact_targets(CONTACTS_PER_RUN))
+        # nguoi ra quyet dinh: co hoi du diem con thieu nguoi (ca co hoi cu), moi co hoi tim lai sau 30 ngay
         people = []
-        if targets and cfg.get("apify_key") and not _wallet_empty:
-            people += people_for(cfg, budget, cfg["llm"], targets[:8])
+        targets = people_targets(cfg) if cfg.get("apify_key") and not _wallet_empty and not budget.stopped else []
+        if targets:
+            people += people_for(cfg, budget, cfg["llm"], targets)
         if cfg.get("apify_key") and not _wallet_empty:
             people += sweep(cfg, budget, cfg["llm"])
         if people:
@@ -1170,6 +1518,18 @@ def page_url():
     return (base.rstrip("/") or "") + "/#san-lead"
 
 
+def contact_cell(o):
+    """SDT / email dau tien cho bang bao cao; khong co thi so nguoi tren LinkedIn hoac '-'."""
+    cc = o.get("company_contact") or {}
+    lead = o.get("contact") or {}
+    phone = (lead.get("phone") or "").split(",")[0].strip() or next((p["value"] for p in cc.get("phones", [])), "")
+    email = lead.get("email") or next((e["value"] for e in cc.get("emails", [])), "")
+    parts = [x for x in (phone, email) if x]
+    if o.get("people_count"):
+        parts.append(f"{o['people_count']} người")
+    return " · ".join(parts[:3]) or "chưa có"
+
+
 def report_text(hours=26, run_id=None, stats=None, cost=0.0, status="ok", message=""):
     since = int(time.time() - hours * 3600) if hours else 0
     opps = owui("GET", "/opportunities?" + urllib.parse.urlencode({"state": "moi", "sort": "score", "limit": 200}))["items"]
@@ -1178,22 +1538,24 @@ def report_text(hours=26, run_id=None, stats=None, cost=0.0, status="ok", messag
     if stats is not None:
         lines.append(f"**Lần quét {'xong' if status == 'ok' else 'xong một phần' if status == 'partial' else 'lỗi'}**: đọc "
                      f"{stats['candidates']} tin mới, **{stats['created']} cơ hội mới**, {stats['merged']} cơ hội gặp lại "
-                     f"(thêm nguồn), {stats['people_created']} người liên hệ mới. Chi phí Apify ${cost:.2f}.")
+                     f"(thêm nguồn), {stats['people_created']} người liên hệ mới, tìm được SĐT / email cho "
+                     f"{stats.get('contacts_found', 0)} doanh nghiệp. Chi phí Apify ${cost:.2f}.")
         if message:
             lines.append(f"Lưu ý: {message}.")
     else:
         lines.append(f"**{len(new)} cơ hội mới** trong {hours} giờ qua (đang ở mục Mới).")
     if new:
         lines.append("")
-        lines.append("| Điểm | Doanh nghiệp | Loại | Tỉnh | Hạn / ngày tin | Thiết bị |")
-        lines.append("|---|---|---|---|---|---|")
+        lines.append("| Điểm | Doanh nghiệp | Loại | Tỉnh | Hạn / ngày tin | Liên hệ | Thiết bị |")
+        lines.append("|---|---|---|---|---|---|---|")
         for o in new[:15]:
             when = f"hạn {'/'.join(reversed(o['deadline'].split('-')))}" if o.get("deadline") else (
                 dt.datetime.fromtimestamp(o["published_at"], VN).strftime("%d/%m/%Y") if o.get("published_at") else "")
             equip = ", ".join(o["equipment"][:3]) + (" (gợi ý)" if o["equipment_inferred"] and o["equipment"] else "")
             link = next((x["url"] for x in o["sources"] if "news.google.com" not in x["url"]), o["sources"][0]["url"] if o["sources"] else "")
             company = f"[{o['company']}]({link})" if link else o["company"]
-            lines.append(f"| {o['score']} | {company} | {o['kind_label']} | {o['province'] or '?'} | {when} | {equip} |")
+            lines.append(f"| {o['score']} | {company} | {o['kind_label']} | {o['province'] or '?'} | {when} | "
+                         f"{contact_cell(o)} | {equip} |")
         if len(new) > 15:
             lines.append(f"\n… và {len(new) - 15} cơ hội khác.")
     lines.append(f"\nXem đủ, đổi trạng thái, xuất CSV: {page_url()}")
@@ -1337,6 +1699,14 @@ def cmd_people(args):
         print(f"Không tìm thấy người phù hợp. {budget.stopped}")
 
 
+def cmd_contacts(args):
+    cfg = owui("GET", "/agent/config")
+    budget = Budget(cfg)
+    opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(args.limit)
+    found = find_contacts(cfg, budget, cfg["llm"], opps)
+    print(f"Tìm liên hệ cho {len(opps)} cơ hội: {found} có SĐT / email. Chi phí ${budget.spent:.3f}. {budget.stopped}")
+
+
 def cmd_check_sources(_):
     cfg = owui("GET", "/agent/config")
     for page in watch_list(cfg):
@@ -1366,6 +1736,10 @@ def main():
     p = sp.add_parser("people")
     p.add_argument("--opportunity", required=True)
     p.set_defaults(f=cmd_people)
+    p = sp.add_parser("contacts")
+    p.add_argument("--opportunity", default="")
+    p.add_argument("--limit", type=int, default=CONTACTS_PER_RUN)
+    p.set_defaults(f=cmd_contacts)
     sp.add_parser("check-sources").set_defaults(f=cmd_check_sources)
     p = sp.add_parser("collect")
     p.add_argument("--out", required=True)
