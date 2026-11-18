@@ -54,7 +54,14 @@ Bình Định bị coi là ngoài vùng).
 
 Không nhận cơ hội: thiếu tên doanh nghiệp cụ thể; ngành ngoài 7 ngành hoặc đang tắt; loại đang tắt; không có link
 nguồn; tỉnh không nhận ra hoặc ngoài vùng; mời thầu thiếu tên gói hoặc đã hết hạn; hạn chót không đọc được; tin cũ hơn
-"Bỏ tin cũ hơn (ngày)" (trừ mời thầu còn hạn). Người liên hệ: thiếu tên, chức danh, công ty, hoặc link không phải hồ sơ.
+"Bỏ tin cũ hơn (ngày)" (mặc định 30, trừ mời thầu còn hạn); mời thầu không ghi hạn mà không rõ ngày đăng hoặc đăng quá
+14 ngày (tháng trong link file, VD /2025-09/, cũng tính là ngày đăng); bài mới nhưng sự kiện chính (`event_date`: khởi
+công, cấp GCN, phê duyệt ĐTM...) đã xảy ra quá "Bỏ tin cũ hơn". LLM cũng loại báo cáo tài chính, bài tổng hợp / phỏng vấn
+chỉ nhắc lại việc cũ. Người liên hệ: thiếu tên, chức danh, công ty, link không phải hồ sơ; người đang tìm việc, thực tập,
+cựu nhân viên, lao động phổ thông.
+
+Cơ hội đã lưu mà thành cũ (mời thầu quá hạn, tin quá ngưỡng) không bị xoá: trang Săn lead ẩn mặc định (bộ lọc "Còn hạn,
+tin mới"), báo cáo, tìm liên hệ và tìm người chỉ xét cơ hội còn mới.
 
 Gộp trùng: cùng công ty (tên đầy đủ / tên ngắn, VD "BAF" và "Công ty TNHH Chế biến Thực phẩm BAF Bình Định"), cùng
 tỉnh, cùng nhóm (dự án / mời thầu; mời thầu thêm tên gói). Gộp thì thêm link nguồn, giữ trạng thái và ghi chú của sale.
