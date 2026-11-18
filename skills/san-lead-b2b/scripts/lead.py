@@ -20,6 +20,8 @@ http://127.0.0.1:8080/api/v1/cqf/lead.
 import argparse
 import concurrent.futures
 import datetime as dt
+import email.utils
+import gzip
 import html
 import json
 import os
@@ -77,6 +79,9 @@ EQUIPMENT_GROUPS = [
     ["dây chuyền fillet", "hầm đông", "băng chuyền IQF", "tủ cấp đông", "máy phân cỡ tôm"],
     ["máy sấy bột cá", "máy ly tâm", "dây chuyền bột cá", "máy ép dầu cá"],
     ["máy sắc ký", "máy quang phổ", "tủ an toàn sinh học", "kính hiển vi", "máy đo độ hòa tan"],
+    ["tủ sấy", "tủ ấm", "lò nung", "cân phân tích", "máy ly tâm"],
+    ["tủ cấy vi sinh", "nồi hấp tiệt trùng", "tủ lạnh âm sâu", "máy đếm khuẩn lạc", "tủ hút khí độc"],
+    ["máy đo TOC", "máy đo BOD", "máy phân tích NIR", "máy phá mẫu vi sóng", "máy đo pH"],
 ]
 INDUSTRY_QUERY = {
     "thuy_san": '"thủy sản" OR "chế biến tôm" OR "cá tra"',
@@ -93,14 +98,71 @@ NOISE_HOSTS = ("youtube.com", "tiktok.com", "wikipedia.org", "shopee.vn", "lazad
 # Trang danh sach duoc theo doi san (da kiem tra doc duoc tu may chu 151.246.182.77 ngay 16/11/2026).
 # Cai dat > Trang theo doi them de bo sung. kind: dtm (danh sach DTM), tender (thong bao moi thau cua 1 doanh nghiep).
 WATCH_DEFAULT = [
+    # --- DTM cua tinh
     {"url": "https://www.camau.gov.vn/danh-gia-tac-dong-moi-truong-child", "label": "ĐTM tỉnh Cà Mau", "kind": "dtm"},
     {"url": "https://snnmt.khanhhoa.gov.vn/danh-sach-tin/categoryid/quyet-dinh-phe-duyet-dtm?BCMenu=BCM_9066",
      "label": "ĐTM tỉnh Khánh Hòa", "kind": "dtm"},
+    # --- Ban Quan ly KCN / KKT va Xuc tien dau tu (sau sap nhap 1/7/2025, moi tinh 1 trang)
+    {"url": "https://investdanang.gov.vn/web/guest/dau-thau-mua-sam-cong", "label": "XTĐT Đà Nẵng: đấu thầu", "kind": "kcn"},
+    {"url": "https://investdanang.gov.vn/web/guest/thong-tin-dau-tu", "label": "XTĐT Đà Nẵng: thông tin đầu tư", "kind": "kcn"},
+    {"url": "https://chulaikkt.danang.gov.vn/tin-tuc-su-kien", "label": "BQL KKT Chu Lai", "kind": "kcn"},
+    {"url": "https://dungquat.quangngai.gov.vn/page/cong-khai-va-thong-bao-110913", "label": "BQL KKT Dung Quất: thông báo", "kind": "kcn"},
+    {"url": "https://dungquat.quangngai.gov.vn/category/3135363-3135372/kinh-te-xuc-tien-dau-tu", "label": "BQL KKT Dung Quất: xúc tiến đầu tư", "kind": "kcn"},
+    {"url": "https://bqlkkt.gialai.gov.vn/vi/news/tin-tuc/", "label": "BQL KKT Gia Lai: tin tức", "kind": "kcn"},
+    {"url": "https://bqlkcn.daklak.gov.vn/thong-bao.html", "label": "BQL KCN Đắk Lắk: thông báo", "kind": "kcn"},
+    {"url": "https://bqlkcn.daklak.gov.vn/p/tin-tuc-su-kien/thong-tin-doanh-nghiep-khu-cong-nghiep.html", "label": "BQL KCN Đắk Lắk: doanh nghiệp", "kind": "kcn"},
+    {"url": "https://ipc.daklakdpi.gov.vn/tin-nhom/chu-truong-du-an-1.html", "label": "XTĐT Đắk Lắk: chủ trương dự án", "kind": "kcn"},
+    {"url": "https://vanphong.khanhhoa.gov.vn/thong-bao-moi-thau", "label": "BQL KKT Vân Phong: mời thầu", "kind": "kcn"},
+    {"url": "https://vanphong.khanhhoa.gov.vn/doanh-nghiep-606", "label": "BQL KKT Vân Phong: doanh nghiệp", "kind": "kcn"},
+    {"url": "https://dnieza.dongnai.gov.vn/Pages/thongbao.aspx", "label": "BQL KCN Đồng Nai: thông báo", "kind": "kcn"},
+    {"url": "https://dnieza.dongnai.gov.vn/Pages/news.aspx?CatId=100", "label": "BQL KCN Đồng Nai: đầu tư", "kind": "kcn"},
+    {"url": "https://dnieza.dongnai.gov.vn/Pages/news.aspx?CatId=105", "label": "BQL KCN Đồng Nai: tin", "kind": "kcn"},
+    # cac cong duoi day chan may chu nuoc ngoai: can proxy Viet Nam (state/proxy), khong co thi doc qua Google site:
+    {"url": "https://ipc.quangngai.gov.vn/tin-tuc-thuong-mai", "label": "XTĐT Quảng Ngãi", "kind": "kcn"},
+    {"url": "https://bqlkkt.gialai.gov.vn/vi/news/thong-bao/", "label": "BQL KKT Gia Lai: thông báo", "kind": "kcn"},
+    {"url": "https://ipa.khanhhoa.gov.vn/du-an-chap-thuan-nha-dau-tu", "label": "XTĐT Khánh Hòa: dự án chấp thuận", "kind": "kcn"},
+    {"url": "https://ipa.khanhhoa.gov.vn/du-an-dau-thau-dau-gia", "label": "XTĐT Khánh Hòa: đấu thầu", "kind": "kcn"},
+    {"url": "https://liza.lamdong.gov.vn/tin-tuc-su-kien", "label": "BQL KCN Lâm Đồng", "kind": "kcn"},
+    {"url": "https://liza.lamdong.gov.vn/thong-tin-doanh-nghiep", "label": "BQL KCN Lâm Đồng: doanh nghiệp", "kind": "kcn"},
+    {"url": "https://bqlkkt.tayninh.gov.vn/thong-bao", "label": "BQL KKT Tây Ninh: thông báo", "kind": "kcn"},
+    {"url": "https://bqlkkt.tayninh.gov.vn/tin-tuc-trong-nganh-74829", "label": "BQL KKT Tây Ninh: tin ngành", "kind": "kcn"},
+    {"url": "https://bqlkkt.dongthap.gov.vn/tin-tuc", "label": "BQL KKT Đồng Tháp", "kind": "kcn"},
+    {"url": "https://bqlkkt.dongthap.gov.vn/đấu-thầu", "label": "BQL KKT Đồng Tháp: đấu thầu", "kind": "kcn"},
+    {"url": "https://bqlkkt.vinhlong.gov.vn/tin-tuc-su-kien", "label": "BQL KKT Vĩnh Long", "kind": "kcn"},
+    {"url": "https://cepiza.cantho.gov.vn/du-an-dau-thau-va-mua-sam-cong", "label": "BQL KCX-KCN Cần Thơ: đấu thầu", "kind": "kcn"},
+    {"url": "https://cepiza.cantho.gov.vn/thong-bao", "label": "BQL KCX-KCN Cần Thơ: thông báo", "kind": "kcn"},
+    {"url": "https://cepiza.cantho.gov.vn/ke-hoach-dau-tu", "label": "BQL KCX-KCN Cần Thơ: đầu tư", "kind": "kcn"},
+    {"url": "https://dav.gov.vn/thong-bao-cn1.html", "label": "Cục Quản lý Dược: thông báo", "kind": "assoc"},
+    {"url": "https://banqlkkt.camau.gov.vn/tin-tuc-su-kien", "label": "BQL KKT Cà Mau", "kind": "kcn"},
+    {"url": "https://banqlkkt.camau.gov.vn/hoat-dong-kinh-doanh-xuc-tien-dau-tu", "label": "BQL KKT Cà Mau: xúc tiến đầu tư", "kind": "kcn"},
+    {"url": "https://bqlkkt.angiang.gov.vn/thong-tin-dau-thau", "label": "BQL KKT An Giang: đấu thầu", "kind": "kcn"},
+    {"url": "https://bqlkkt.angiang.gov.vn/tin-doanh-nghiep", "label": "BQL KKT An Giang: doanh nghiệp", "kind": "kcn"},
+    # --- Hiep hoi, Cuc, bao dau thau
+    {"url": "https://vasep.com.vn/thong-bao", "label": "VASEP: thông báo", "kind": "assoc"},
+    {"url": "https://vasep.com.vn/tieu-diem", "label": "VASEP: tiêu điểm", "kind": "assoc"},
+    {"url": "https://cucthuy.gov.vn/web/guest/tin-tuyen-dung-dau-thau", "label": "Cục Chăn nuôi và Thú y: đấu thầu", "kind": "assoc"},
+    {"url": "https://baodauthau.vn/thong-bao-moi-thau/", "label": "Báo Đấu thầu: thông báo mời thầu", "kind": "tender_board"},
+    # --- trang moi thau / tin tuc cua doanh nghiep lon
     {"url": "https://dhgpharma.com.vn/vi/thong-bao", "label": "Thông báo DHG Pharma", "kind": "tender",
      "company": "Công ty Cổ phần Dược Hậu Giang", "industry": "duoc", "province": "Cần Thơ"},
     {"url": "https://bidiphar.com/category/thong-tin-moi-thau/", "label": "Mời thầu Bidiphar", "kind": "tender",
      "company": "Công ty Cổ phần Dược - Trang thiết bị Y tế Bình Định (Bidiphar)", "industry": "duoc", "province": "Gia Lai"},
+    {"url": "https://domesco.com/tin-tuc/thong-bao-moi-thau.html", "label": "Mời thầu Domesco", "kind": "tender",
+     "company": "Công ty Cổ phần Xuất nhập khẩu Y tế Domesco", "industry": "duoc", "province": "Đồng Tháp"},
+    {"url": "https://navicorp.com.vn/vi/thong-bao-moi-thau", "label": "Mời thầu Navico", "kind": "tender",
+     "company": "Công ty Cổ phần Nam Việt (Navico)", "industry": "thuy_san", "province": "An Giang"},
+    {"url": "https://www.minhphu.com/tin-tuc/", "label": "Tin Minh Phú", "kind": "company",
+     "company": "Công ty Cổ phần Tập đoàn Thủy sản Minh Phú", "industry": "thuy_san", "province": "Cà Mau"},
+    {"url": "https://www.vinhhoan.com/category/news/", "label": "Tin Vĩnh Hoàn", "kind": "company",
+     "company": "Công ty Cổ phần Vĩnh Hoàn", "industry": "thuy_san", "province": "Đồng Tháp"},
+    {"url": "https://vietuc.com/truyen-thong/thong-tin-bao-chi/tin-tuc-su-kien/", "label": "Tin Việt Úc", "kind": "company",
+     "company": "Công ty Cổ phần Tập đoàn Việt Úc", "industry": "thuy_san"},
+    {"url": "https://www.masangroup.com/news/masan-news/", "label": "Tin Masan", "kind": "company",
+     "company": "Công ty Cổ phần Tập đoàn Masan", "industry": "fnb"},
+    {"url": "https://www.greenfeed.com.vn/chuyen-muc/tin-tuc-va-su-kien/", "label": "Tin GreenFeed", "kind": "company",
+     "company": "Công ty Cổ phần GreenFeed Việt Nam", "industry": "cam_hoa_chat"},
 ]
+WATCH_FIRST_VISIT = 10  # trang moi them: lan dau chi doc 10 link dau (moi nhat), con lai danh dau da xem
 # Cong chan IP nuoc ngoai (may chu o Singapore khong mo duoc) hoac chi co file: doc qua Google (site:), khong vuot chan.
 SITE_GROUPS_DTM = [
     ["sonnmt.cantho.gov.vn", "snnmt.tayninh.gov.vn", "snnmt.angiang.gov.vn"],
@@ -108,10 +170,21 @@ SITE_GROUPS_DTM = [
     ["dongthap.gov.vn", "hepza.hochiminhcity.gov.vn", "sonnmt.hochiminhcity.gov.vn"],
     ["snnmt.daklak.gov.vn", "snnmt.gialai.gov.vn", "chulaikkt.danang.gov.vn", "thamvan.mae.gov.vn"],
 ]
+# Ban quan ly KCN / KKT: trang chay JavaScript hoac chan IP nuoc ngoai -> doc qua Google (cap GCN, chu truong, khoi cong)
+# (cac cong nay chan may chu o nuoc ngoai hoac chay JavaScript: kiem tra 18/11/2026 tu may chu Singapore)
+SITE_GROUPS_KCN = [
+    ["hepza.hochiminhcity.gov.vn", "dseza.danang.gov.vn", "cepiza.cantho.gov.vn", "ipc.quangngai.gov.vn"],
+    ["bqlkkt.dongthap.gov.vn", "bqlkkt.vinhlong.gov.vn", "bqlkkt.tayninh.gov.vn", "liza.lamdong.gov.vn"],
+    ["ipa.khanhhoa.gov.vn", "bqlkkt.gialai.gov.vn", "dav.gov.vn", "bqlkkt.angiang.gov.vn"],
+]
+# Mua sam cong: muasamcong khong co du lieu mo; doc cac trang tong hop cong khai qua Google
+SITE_TENDER_PORTALS = ["muasamcong.mof.gov.vn", "dauthau.asia", "bidwinner.info", "baodauthau.vn", "thongtindauthau.com.vn"]
+JOB_SITES = ["jobsgo.vn", "careerviet.vn", "vietnamworks.com", "123job.vn", "topcv.vn", "joboko.com"]
 SITE_GROUPS_TENDER = [
     ["domesco.com", "navicorp.com.vn", "imexpharm.com", "pymepharco.com"],
     ["vinhhoan.com", "minhphu.com", "fimexvn.com", "idiseafood.com"],
     ["vienkiemnghiem.gov.vn", "nifc.gov.vn", "vinamilk.com.vn", "greenfeed.com.vn"],
+    ["cp.com.vn", "vietuc.com", "masangroup.com", "deheus.com.vn", "vissan.com.vn", "dav.gov.vn", "cucthuy.gov.vn"],
 ]
 
 # ---------------------------------------------------------------- tien ich
@@ -179,30 +252,88 @@ def http_json(method, url, body=None, headers=None, timeout=60):
         raise RuntimeError(f"{method} {url.split('?')[0]} -> {error.code}: {detail}") from None
 
 
-def fetch_text(url, timeout=18, limit=1_600_000):
-    """(html, final_url) of a page; '' on failure. Lenient TLS for .gov.vn."""
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "vi,en;q=0.8"})
-    for lenient in (False, True):
+def _proxy_url():
+    """Proxy Viet Nam (tuy chon): env LEAD_PROXY hoac file state/proxy (1 dong http://user:pass@host:port, chmod 600).
+    Chi dung cho trang chan IP nuoc ngoai (.gov.vn) - doc nhu nguoi o Viet Nam, khong vuot captcha / chong bot."""
+    value = os.environ.get("LEAD_PROXY", "").strip()
+    if not value:
         try:
-            with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context(lenient)) as res:
+            with open(os.path.join(STATE, "proxy"), encoding="utf-8") as f:
+                value = f.read().strip()
+        except OSError:
+            value = ""
+    if value and not value.startswith(("http://", "https://", "socks")):
+        parts = value.split(":")  # host:port:user:pass
+        if len(parts) == 4:
+            value = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    return value
+
+
+PROXY = _proxy_url()
+
+
+def _use_proxy_first(url):
+    return bool(PROXY) and _host_of(url).endswith(".gov.vn")
+
+
+def _host_of(url):
+    return urllib.parse.urlsplit(url).netloc.lower().split("@")[-1].split(":")[0]
+
+
+def _fetch_once(url, timeout, limit, proxy):
+    """(html, final_url, ok)."""
+    url = urllib.parse.quote(url, safe=":/?&=%#+,;@!$'()*[]~")  # duong dan co dau (VD /đấu-thầu)
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "vi,en;q=0.8", "Accept-Encoding": "gzip"})
+    for lenient in (False, True):
+        handlers = [urllib.request.HTTPSHandler(context=_ssl_context(lenient))]
+        handlers.append(urllib.request.ProxyHandler({"http": proxy, "https": proxy} if proxy else {}))
+        opener = urllib.request.build_opener(*handlers)
+        try:
+            with opener.open(req, timeout=timeout) as res:
                 ctype = res.headers.get("Content-Type", "")
                 if "html" not in ctype and "xml" not in ctype and ctype:
-                    return "", res.geturl()
+                    return "", res.geturl(), True
                 raw = res.read(limit)
+                if res.headers.get("Content-Encoding", "").lower() == "gzip" or raw[:2] == bytes([0x1F, 0x8B]):
+                    try:
+                        raw = gzip.decompress(raw)
+                    except (OSError, EOFError):
+                        pass
                 charset = (res.headers.get_content_charset() or "utf-8").split(",")[0].strip()
                 try:
-                    return raw.decode(charset, "replace"), res.geturl()
+                    return raw.decode(charset, "replace"), res.geturl(), True
                 except LookupError:  # bang ma la ("utf-8,gbk", "none"...)
-                    return raw.decode("utf-8", "replace"), res.geturl()
+                    return raw.decode("utf-8", "replace"), res.geturl(), True
         except ssl.SSLError:
             continue
+        except urllib.error.HTTPError:
+            return "", url, False
         except urllib.error.URLError as error:
             if isinstance(getattr(error, "reason", None), ssl.SSLError) and not lenient:
                 continue
-            return "", url
+            return "", url, False
         except (TimeoutError, OSError, ValueError):
-            return "", url
-    return "", url
+            return "", url, False
+    return "", url, False
+
+
+def fetch_text(url, timeout=18, limit=1_600_000):
+    """(html, final_url) of a page; '' on failure. Lenient TLS for .gov.vn. Cong .gov.vn di qua proxy Viet Nam neu co;
+    loi thi thu duong con lai (truc tiep <-> proxy)."""
+    first = PROXY if _use_proxy_first(url) else ""
+    raw, final, ok = _fetch_once(url, timeout, limit, first)
+    if not ok and PROXY:
+        raw, final, ok = _fetch_once(url, timeout, limit, "" if first else PROXY)
+    return raw, final
+
+
+def load_config():
+    """Cau hinh tu trang San lead; proxy nhap o Cai dat (uu tien hon env LEAD_PROXY / file state/proxy)."""
+    global PROXY
+    cfg = owui("GET", "/agent/config")
+    if cfg.get("proxy"):
+        PROXY = cfg["proxy"]
+    return cfg
 
 
 def strip_html(raw):
@@ -222,7 +353,7 @@ def plain_text(raw):
     return "\n".join(line for line in lines if len(line) > 1)
 
 
-PHONE_RE = re.compile(r"(?<![\d.,])(?:\(?\+?84\)?[\s.\-]?\(?0?\)?|\(?0)(?:\d[\s.\-)]{0,2}){8,10}(?![\d])"
+PHONE_RE = re.compile(r"(?<![\d.,])(?:\(?\+?84\)?[ \t.\-]?\(?0?\)?|\(?0)(?:\d[ \t.\-)]{0,2}){8,10}(?![\d])"
                       r"|(?<![\d.,])(?:1800[\s.\-]?\d{2}[\s.\-]?\d{2}|1900[\s.\-]?\d{2,3}[\s.\-]?\d{2,3})(?![\d])")
 EMAIL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 CONTACT_WORDS = ("liên hệ", "điện thoại", "đt:", "đt :", "tel", "hotline", "email", "e-mail", "fax", "di động", "zalo")
@@ -502,7 +633,11 @@ Chỉ giữ (keep=true) khi tin nói về MỘT doanh nghiệp / chủ đầu t�
   my_pham = Mỹ phẩm, hóa mỹ phẩm, chất tẩy rửa
   cam_hoa_chat = Thức ăn chăn nuôi / thủy sản, premix, hóa chất, dung môi, sơn keo
 VÀ tin cho thấy họ sắp hoặc đang mua thiết bị, theo một trong 4 loại (kind):
-  moi_thau = mời thầu / thư mời chào giá / yêu cầu báo giá cho MÁY MÓC, THIẾT BỊ, DÂY CHUYỀN, THIẾT BỊ PHÒNG THÍ NGHIỆM
+  moi_thau = mời thầu / thư mời chào giá / chào giá cạnh tranh / chào hàng cạnh tranh / yêu cầu báo giá cho MÁY MÓC,
+             THIẾT BỊ, DÂY CHUYỀN, THIẾT BỊ PHÒNG THÍ NGHIỆM, ĐO LƯỜNG, KIỂM NGHIỆM, HỆ THỐNG ĐÓNG GÓI. Gồm cả gói mua
+             thiết bị lab / kiểm nghiệm của viện nghiên cứu, trường đại học, trung tâm kiểm nghiệm, chi cục, cơ quan nhà
+             nước thuộc lĩnh vực thủy sản, thú y, chăn nuôi, dược, thực phẩm, nông nghiệp, hóa học (ghi industry là ngành
+             gần nhất trong 7 mã); company = tên đơn vị mời thầu
   du_an_moi = dự án nhà máy mới: được cấp phép / chấp thuận đầu tư, đang lập ĐTM, động thổ, khởi công, đang xây
   mo_rong = nhà máy đang chạy mở rộng, nâng công suất, thêm dây chuyền, cải tạo, tự động hóa
   tin_hieu = tín hiệu khác: tuyển trưởng ban QLDA / chỉ huy trưởng / kỹ sư cơ điện cho nhà máy mới, phê duyệt ĐTM...
@@ -527,8 +662,11 @@ Quy tắc điền:
   hình loại nhà máy đó cần, ưu tiên hàng bên bán có, và đặt equipment_inferred=true. Mỗi hạng mục là MỘT thiết bị, tối
   đa 6 từ (VD "Tủ an toàn sinh học", "Máy phân tích NIR"), không gộp nhiều thiết bị, không mở ngoặc liệt kê.
 - deadline: hạn nộp hồ sơ / báo giá YYYY-MM-DD, chỉ khi nguồn ghi. progress: tiến độ CHÉP ĐÚNG mốc thời gian trong
-  nguồn ("được cấp phép 9/2026, khởi công quý 1/2027"); không tự suy ra năm hay ngày nguồn không ghi. value: chỉ số
-  tiền (vốn đầu tư / giá gói, VD "1.250 tỷ đồng"); không có số tiền thì "".
+  nguồn ("được cấp phép 9/2026, khởi công quý 1/2027"); không tự suy ra năm hay ngày nguồn không ghi. Với moi_thau,
+  progress ghi HÌNH THỨC lựa chọn (chào giá cạnh tranh, chào hàng cạnh tranh, đấu thầu rộng rãi, mua sắm trực tiếp...),
+  số TBMT / mã gói nếu có, thời điểm đóng / mở thầu. value: chỉ số tiền (giá gói thầu, dự toán, giá trần, vốn đầu tư,
+  VD "1,25 tỷ đồng"); không có số tiền thì "". equipment của moi_thau: liệt kê đúng các mặt hàng trong danh mục mời
+  chào giá (tối đa 12).
 - contact: {name, phone, email} của đầu mối / bộ phận nhận hồ sơ, báo giá khi nguồn ghi (xem cả "Dòng liên hệ trong
   trang"). Chép đúng số và email như nguồn; nhiều số thì cách nhau dấu phẩy. Không lấy số của tòa soạn báo, của trang
   đăng tin hay của nhà cung cấp. Không bịa.
@@ -583,6 +721,7 @@ sinh viên, người ở nước ngoài, hồ sơ không rõ công ty.
 Điền: name (đúng như hồ sơ), title (chức danh hiện tại), company (công ty hiện tại), role_group (ky_thuat | san_xuat_qa |
 mua_sam | khac), industry (duoc | thu_y | thuy_san | bot_ca | fnb | my_pham | cam_hoa_chat | ""), location,
 sales_note (1-2 câu: vì sao người này đáng gặp, chào thiết bị gì; dựa trên cơ hội nếu có, không bịa).
+Nếu tin nhắn có dòng "ĐẦU MỐI GIÁN TIẾP", làm theo dòng đó cho trường hợp không có ai ra quyết định.
 Trả về ĐÚNG MỘT JSON array: [{"i": số, "keep": true/false, "reason": "...", "person": {...}}]. Không viết gì ngoài JSON."""
 
 
@@ -703,10 +842,13 @@ def build_queries(cfg):
         return " OR ".join(f'"{w}"' for w in words)
 
     kinds = s["kinds"]
+    portals = " OR ".join(f"site:{x}" for x in SITE_TENDER_PORTALS)
     for n in range(len(groups)):
         g = groups[(turn + n) % len(groups)]
         if "moi_thau" in kinds:
             queries.append(f'("thư mời chào giá" OR "thư mời báo giá" OR "yêu cầu báo giá" OR "chào giá cạnh tranh") ({ors(g)})')
+            queries.append(f'("thông báo mời thầu" OR "chào hàng cạnh tranh" OR "gói thầu" OR "mua sắm") ({ors(g)})')
+            queries.append(f'({portals}) ({ors(g)})')
     for n, ind in enumerate(order):
         chunk = chunks[(turn + n) % len(chunks)]
         place = f" ({ors(chunk)})" if chunk else ""
@@ -719,24 +861,32 @@ def build_queries(cfg):
     if "tin_hieu" in kinds:
         queries.append('("tuyển" OR "tuyển dụng") ("trưởng ban quản lý dự án" OR "chỉ huy trưởng" OR "kỹ sư cơ điện") '
                        '"nhà máy" ("thủy sản" OR "dược" OR "thực phẩm" OR "thức ăn chăn nuôi")')
+        jobs = " OR ".join(f"site:{x}" for x in JOB_SITES)
+        queries.append(f'({jobs}) ("chỉ huy trưởng" OR "trưởng ban quản lý dự án" OR "ban QLDA" OR "kỹ sư dự án") '
+                       '("nhà máy mới" OR "dự án nhà máy" OR "xây dựng nhà máy") '
+                       '("thủy sản" OR "dược" OR "thực phẩm" OR "thức ăn chăn nuôi" OR "bột cá")')
     if "moi_thau" in kinds:
-        g = groups[turn % len(groups)]
-        queries.append(f'site:dauthau.asia OR site:bidwinner.info ({ors(g)})')
         sites = SITE_GROUPS_TENDER[turn % len(SITE_GROUPS_TENDER)]
         queries.append("(" + " OR ".join(f"site:{x}" for x in sites) + ') ("mời thầu" OR "chào giá" OR "báo giá" OR "chào thầu")')
+    if "du_an_moi" in kinds or "mo_rong" in kinds:
+        sites = SITE_GROUPS_KCN[turn % len(SITE_GROUPS_KCN)]
+        queries.append("(" + " OR ".join(f"site:{x}" for x in sites) + ') ("giấy chứng nhận đăng ký đầu tư" OR '
+                       '"chủ trương đầu tư" OR "khởi công" OR "mời chào giá" OR "nhà máy")')
     if "du_an_moi" in kinds or "tin_hieu" in kinds:
         sites = SITE_GROUPS_DTM[turn % len(SITE_GROUPS_DTM)]
         queries.append("(" + " OR ".join(f"site:{x}" for x in sites) + ') ("nhà máy" OR "chế biến") ("tác động môi trường" OR "ĐTM" OR "giấy phép môi trường")')
     # xen ke: moi thau, du an, mo rong... de khi cat bot van du loai
-    tender = [q for q in queries if "chào giá" in q or "site:" in q or "tác động môi trường" in q]
+    # uu tien moi thau / chao gia: 2 truy van moi thau roi 1 truy van du an
+    tender = [q for q in queries if any(w in q for w in ("chào giá", "mời thầu", "báo giá", "gói thầu")) or
+              any(f"site:{x}" in q for x in SITE_TENDER_PORTALS)]
     rest = [q for q in queries if q not in tender]
     mixed = []
     while tender or rest:
-        if tender:
-            mixed.append(tender.pop(0))
         for _ in range(2):
-            if rest:
-                mixed.append(rest.pop(0))
+            if tender:
+                mixed.append(tender.pop(0))
+        if rest:
+            mixed.append(rest.pop(0))
     return mixed[: int(s.get("google_queries_per_run") or 0)]
 
 
@@ -744,12 +894,12 @@ def news_queries(cfg):
     s = cfg["settings"]
     days = min(int(s.get("lookback_days") or 30), 60)
     industries = [k for k in s["industries"] if k in INDUSTRY_QUERY]
-    out = []
+    # han che bao: chi 2 truy van moi chao gia + 1 truy van du an nha may moi nganh
+    out = [f'("thư mời chào giá" OR "chào giá cạnh tranh" OR "mời báo giá" OR "chào hàng cạnh tranh") ("thiết bị" OR "máy") when:{days}d',
+           f'("mời thầu" OR "gói thầu") ("thiết bị phòng thí nghiệm" OR "thiết bị kiểm nghiệm" OR "máy móc thiết bị") when:{days}d']
     for ind in industries:
         terms = INDUSTRY_QUERY[ind]
-        out.append(f'("khởi công" OR "động thổ" OR "xây dựng nhà máy") ({terms}) when:{days}d')
-        out.append(f'("cấp phép đầu tư" OR "chứng nhận đăng ký đầu tư" OR "chủ trương đầu tư") "nhà máy" ({terms}) when:{days}d')
-        out.append(f'("mở rộng nhà máy" OR "nâng công suất" OR "dây chuyền mới") ({terms}) when:{days}d')
+        out.append(f'("khởi công" OR "cấp phép đầu tư" OR "chứng nhận đăng ký đầu tư" OR "mở rộng") "nhà máy" ({terms}) when:{days}d')
     return out
 
 
@@ -784,6 +934,28 @@ def watch_list(cfg):
     return pages
 
 
+def rss_links(raw):
+    """RSS / Atom: tieu de, link, ngay dang."""
+    out = []
+    for block in re.findall(r"(?is)<(?:item|entry)\b.*?</(?:item|entry)>", raw):
+        title = re.search(r"(?is)<title[^>]*>(.*?)</title>", block)
+        link = re.search(r"(?is)<link[^>]*>(.*?)</link>", block) or re.search(r'(?is)<link[^>]*href=["\']([^"\']+)', block)
+        date = re.search(r"(?is)<(?:pubDate|published|updated|dc:date)[^>]*>(.*?)</", block)
+        if not (title and link):
+            continue
+        text = html.unescape(re.sub(r"<!\[CDATA\[|\]\]>|<[^>]+>", "", title.group(1))).strip()
+        href = html.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", link.group(1))).strip()
+        day = ""
+        if date:
+            try:
+                day = email.utils.parsedate_to_datetime(date.group(1).strip()).date().isoformat()
+            except (TypeError, ValueError):
+                day = date.group(1).strip()[:10]
+        if href.startswith("http") and len(text) >= 15:
+            out.append({"title": text[:300], "url": href, "date": day})
+    return out
+
+
 def page_links(page):
     try:
         raw, final = fetch_text(page["url"], timeout=25)
@@ -791,6 +963,8 @@ def page_links(page):
         return None
     if not raw:
         return None
+    if re.search(r"(?is)<(rss|feed)\b", raw[:2000]):
+        return rss_links(raw)
     links, seen = [], set()
     host = urllib.parse.urlsplit(final).netloc
     for m in re.finditer(r'(?is)<a\b[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', raw):
@@ -805,33 +979,82 @@ def page_links(page):
     return links
 
 
+KCN_TERMS = ["nhà máy", "dự án", "chứng nhận đăng ký đầu tư", "giấy chứng nhận", "chủ trương đầu tư", "cấp mới",
+             "điều chỉnh", "khởi công", "động thổ", "mở rộng", "chào giá", "báo giá", "mời thầu", "gói thầu",
+             "mua sắm", "nhà đầu tư", "sản xuất", "chế biến"]
+
+
+LAB_BUYERS = ["viện", "đại học", "trường", "học viện", "kiểm nghiệm", "phòng thí nghiệm", "trung tâm kỹ thuật",
+              "quan trắc", "kiểm định", "đo lường", "chất lượng", "thú y", "chăn nuôi", "nông nghiệp", "thủy sản",
+              "dược", "thực phẩm", "sữa", "bia", "nước giải khát", "thức ăn", "hóa chất", "mỹ phẩm", "y tế dự phòng",
+              "an toàn thực phẩm", "nuôi trồng"]
+NOT_BUYERS = ["bệnh viện", "phòng khám", "cảng", "điện gió", "điện mặt trời", "năng lượng", "hàng không", "ngân hàng", "tín dụng", "bảo hiểm",
+              "viễn thông", "xăng dầu", "than", "khoáng sản", "đường sắt", "cao tốc", "nhiệt điện", "thủy điện",
+              "truyền tải điện", "điện lực", "bưu điện", "vận tải", "xi măng", "thép"]
+
+
+def _watch_ok(page, title):
+    f = fold(title)
+    kind = page.get("kind")
+    industry = any(has_any(f, t) for t in INDUSTRY_TERMS.values())
+    if kind == "tender_board":  # Bao Dau thau: tieu de chi co ten don vi -> giu don vi co the mua thiet bi lab / 7 nganh
+        return has_any(f, ["chào giá", "mời thầu", "báo giá", "chào hàng"]) and (industry or has_any(f, LAB_BUYERS))             and not has_any(f, NOT_BUYERS)
+    if kind == "tender":
+        return has_any(f, ["chào giá", "báo giá", "mời thầu", "chào thầu", "gói", "mua sắm"]) and has_any(f, EQUIPMENT_TERMS)
+    if kind == "dtm":
+        return has_any(f, ["nhà máy", "chế biến", "sản xuất"]) or industry
+    if kind == "kcn":  # BQL KCN / XTDT: cap GCN, chu truong, nha may moi, moi chao gia (LLM loc nganh sau)
+        return has_any(f, KCN_TERMS)
+    if kind == "company":  # tin cua chinh doanh nghiep: nha may, mo rong, khoi cong
+        return has_any(f, SIGNAL_TERMS + ["nhà máy", "đầu tư", "công suất"])
+    if kind in ("news", "assoc"):
+        return (industry and has_any(f, SIGNAL_TERMS + ["nhà máy", "đầu tư"])) or has_any(
+            f, ["khởi công nhà máy", "động thổ nhà máy", "xây dựng nhà máy", "chứng nhận đăng ký đầu tư", "mời chào giá"])
+    return has_any(f, SIGNAL_TERMS + EQUIPMENT_TERMS)
+
+
+def _first_visit(pages):
+    """Trang theo doi lan dau: tra ve tap url trang da tung doc (de gioi han lan dau)."""
+    path = os.path.join(STATE, "watch-visited.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            visited = set(json.load(f))
+    except (OSError, ValueError):
+        visited = set()
+    return visited, path
+
+
 def collect_watch(cfg):
     items, report = [], []
     pages = watch_list(cfg)
+    visited, visited_path = _first_visit(pages)
     with concurrent.futures.ThreadPoolExecutor(FETCH_WORKERS) as pool:
         for page, links in zip(pages, pool.map(page_links, pages)):
             if links is None:
                 report.append(f"{page['label']}: không đọc được")
                 continue
             kept = 0
+            first = page["url"] not in visited
+            visited.add(page["url"])
             for link in links:
-                f = fold(link["title"])
-                if page.get("kind") == "tender":
-                    ok = has_any(f, ["chào giá", "báo giá", "mời thầu", "chào thầu", "gói"]) and has_any(f, EQUIPMENT_TERMS)
-                elif page.get("kind") == "dtm":
-                    ok = has_any(f, ["nhà máy", "chế biến", "sản xuất"]) or any(has_any(f, t) for t in INDUSTRY_TERMS.values())
-                else:
-                    ok = has_any(f, SIGNAL_TERMS + EQUIPMENT_TERMS)
-                if ok:
+                if first and kept >= WATCH_FIRST_VISIT * (3 if page.get("kind") == "tender_board" else 1):
+                    break  # lan dau: chi tin dau trang (moi nhat), khong doc ca kho tin cu
+                if _watch_ok(page, link["title"]):
                     hint = page["label"]
                     if page.get("company"):
                         hint += f"; đơn vị: {page['company']}; tỉnh: {page.get('province', '')}"
                     items.append({"origin": "Trang theo dõi", "hint": hint, "title": link["title"], "url": link["url"],
-                                  "snippet": "", "date": "", "company": page.get("company", ""),
+                                  "snippet": "", "date": link.get("date", ""), "company": page.get("company", ""),
                                   "province": page.get("province", ""),
                                   "meta": f"industry={page['industry']}" if page.get("industry") else ""})
                     kept += 1
             report.append(f"{page['label']}: {len(links)} link, {kept} đáng đọc")
+    try:
+        os.makedirs(STATE, exist_ok=True)
+        with open(visited_path, "w", encoding="utf-8") as f:
+            json.dump(sorted(visited), f)
+    except OSError:
+        pass
     log("Trang theo dõi: " + "; ".join(report))
     return items, report
 
@@ -872,7 +1095,8 @@ def enrich(items):
 # ---------------------------------------------------------------- lien he doanh nghiep
 
 
-REGISTRY_HOSTS = ("masothue.com", "hsctvn.com", "thongtindoanhnghiep.co", "infodoanhnghiep.com", "trangvangvietnam.com",
+REGISTRY_HOSTS = ("vnr500.vn", "huba.vn", "hosocongty", "vietnamcredit", "kompass", "vietnamdoanhnghiep", "doanhnghiepvn",
+                  "masothue.com", "hsctvn.com", "thongtindoanhnghiep.co", "infodoanhnghiep.com", "trangvangvietnam.com",
                   "yellowpages.vn", "doanhnghiep.biz", "tratencongty.com", "vinabiz.org", "thuvienphapluat.vn",
                   "masocongty.vn", "trangthongtin.vn", "dnb.com", "emis.com", "timcongty", "vietnamworks.com",
                   "topcv.vn", "careerviet.vn", "itviec.com", "congty.vn", "doanhnghiepmoi.vn")
@@ -970,8 +1194,7 @@ def find_contacts(cfg, budget, llm, opps):
     queries = {}
     for o in opps:
         short = short_company(o["company"]) or o["company"]
-        name = o["company"] if len(o["company"]) <= 70 else short
-        queries[o["id"]] = [f'"{name}" điện thoại email', f'"{short}" mã số thuế địa chỉ',
+        queries[o["id"]] = [f'"{short}" liên hệ điện thoại email', f'"{short}" mã số thuế địa chỉ',
                             f'site:linkedin.com/company "{short}"']
     flat = [q for qs in queries.values() for q in qs]
     results = google_search(budget, flat, after)
@@ -999,6 +1222,12 @@ def find_contacts(cfg, budget, llm, opps):
                 for u in (r["url"], root):
                     if u not in own:
                         own.append(u)
+        # trang tra cuu / doan trich hay ghi "Website: ..." cua cong ty
+        for r in res:
+            for dom in re.findall(r"(?i)\b(?:https?://)?(?:www\.)?((?:[a-z0-9-]+\.)+(?:com\.vn|vn|com|net))\b", f"{r['title']} {r['snippet']}"):
+                url = f"https://{dom.lower()}/"
+                if _own_site(url, "", o["company"]) and url not in own:
+                    own.append(url)
         registry = [r["url"] for r in res if any(h in _host(r["url"]) for h in REGISTRY_HOSTS)][:2]
         pages = own[:3] + registry
         fetched = {}
@@ -1029,7 +1258,7 @@ def find_contacts(cfg, budget, llm, opps):
             except (ValueError, RuntimeError) as error:
                 log(f"Liên hệ {o['company'][:40]}: lỗi đọc ({error})")
                 continue
-            record = check_contact(picked if isinstance(picked, dict) else {}, evidence)
+            record = check_contact(picked if isinstance(picked, dict) else {}, evidence, o["company"])
         owui("POST", f"/agent/opportunities/{o['id']}/contact", record)
         got = [f"{len(record.get('phones', []))} SĐT", f"{len(record.get('emails', []))} email"]
         if record.get("website"):
@@ -1042,7 +1271,7 @@ def find_contacts(cfg, budget, llm, opps):
     return found
 
 
-def check_contact(picked, evidence):
+def check_contact(picked, evidence, company=""):
     """Chi giu gia tri co that trong bang chung model chi ra (chong bia)."""
     def ev(item):
         if isinstance(item, dict) and isinstance(item.get("e"), int) and 0 <= item["e"] < len(evidence):
@@ -1064,7 +1293,10 @@ def check_contact(picked, evidence):
             if not re.search(r"\b(fax|ma so thue|mst|tax|so dkkd|giay phep)\b", before):  # MST / fax giong SDT
                 ok = True
         if len(digits) >= 8 and ok:
-            out["phones"].append({"value": item["value"], "label": str(item.get("label") or "")[:60], "url": e["url"]})
+            label = str(item.get("label") or "")[:60]
+            if any(h in _host(e["url"]) for h in REGISTRY_HOSTS):
+                label = f"đăng ký kinh doanh ({_host(e['url'])})"  # so dang ky, co the la ke toan / dich vu
+            out["phones"].append({"value": item["value"], "label": label, "url": e["url"]})
             used.append(e["url"])
     for item in (picked.get("emails") or [])[:6]:
         e = ev(item)
@@ -1088,13 +1320,18 @@ def check_contact(picked, evidence):
         url = e["url"]
         if key == "website":
             parts = urllib.parse.urlsplit(url)
-            if any(h in _host(url) for h in REGISTRY_HOSTS + NEWS_HOSTS) or "linkedin." in url or "facebook." in url:
+            if not _own_site(url, "", company):  # ten mien phai mang ten cong ty (khong lay trang xep hang, tra cuu)
                 continue
             url = f"{parts.scheme}://{parts.netloc}/"
         elif key == "linkedin_company" and "linkedin.com/company/" not in url:
             continue
-        elif key == "facebook" and "facebook.com" not in url:
-            continue
+        elif key == "facebook":
+            m = re.match(r"https?://([a-z]+\.)?facebook\.com/([^/?#]+)", url)
+            if not m or m.group(2) in ("permalink.php", "profile.php", "groups", "watch", "story.php"):
+                continue
+            if not any(w in fold(m.group(2)).replace(" ", "") for w in _distinct_words(company)):
+                continue  # trang cua bao / nguoi khac dang lai
+            url = f"https://www.facebook.com/{m.group(2)}"
         out[key] = url
         used.append(e["url"])
     out["sources"] = [{"url": u} for u in dict.fromkeys(used)]
@@ -1118,7 +1355,7 @@ def contact_targets(limit):
 
 
 def short_company(name):
-    words = re.sub(r"(?i)\b(công ty|cổ phần|tnhh|một thành viên|mtv|ctcp|jsc|co\.?,? ?ltd\.?|tập đoàn|tổng công ty|"
+    words = re.sub(r"(?i)\b(công ty|cty|cổ phần|cp|tnhh|một thành viên|mtv|ctcp|jsc|co\.?,? ?ltd\.?|tập đoàn|tổng công ty|"
                    r"việt nam|vietnam|chi nhánh|joint stock company|company|limited|corporation)\b", " ", name)
     words = re.sub(r"[^\w\s&-]", " ", words)
     return re.sub(r"\s+", " ", words).strip()
@@ -1241,7 +1478,11 @@ def people_for(cfg, budget, llm, opps):
             continue
         context = (f"Công ty mục tiêu: {o['company']} ({o.get('industry_label') or o['industry']}, {o.get('province') or ''}).\n"
                    f"Cơ hội: {o.get('kind_label') or o['kind']}: {o.get('title') or ''}. {o.get('summary') or ''}\n"
-                   "Chỉ giữ người hiện làm ở ĐÚNG công ty mục tiêu.")
+                   "Chỉ giữ người hiện làm ở ĐÚNG công ty mục tiêu.\n"
+                   "ĐẦU MỐI GIÁN TIẾP: nếu trong danh sách không có ai ra quyết định ở công ty mục tiêu, vẫn giữ tối đa 2 người "
+                   "HIỆN làm ở đúng công ty đó (ưu tiên quản lý, hành chính, văn phòng, nhân sự, IT; vẫn loại người ở công ty "
+                   "khác), role_group=khac, sales_note bắt đầu bằng \"Đầu mối gián tiếp:\" và gợi ý nhờ họ giới thiệu phòng "
+                   "kỹ thuật / mua hàng.")
         kept = classify_people(llm, s["seller"], profiles, context)
         for person in kept[: int(s.get("people_per_opportunity") or 4)]:
             person["opportunity_id"] = o["id"]
@@ -1415,7 +1656,7 @@ def read_items(cfg, items):
 
 
 def run(trigger="chat"):
-    cfg = owui("GET", "/agent/config")
+    cfg = load_config()
     s = cfg["settings"]
     if cfg["llm"].get("error"):
         die(f"Không gọi được LLM của Hermes: {cfg['llm']['error']}")
@@ -1566,7 +1807,7 @@ def report_text(hours=26, run_id=None, stats=None, cost=0.0, status="ok", messag
 
 
 def cmd_status(_):
-    cfg = owui("GET", "/agent/config")
+    cfg = load_config()
     s, k = cfg["settings"], cfg["apify"]
     print(f"Key Apify: {'có (••••' + k['last4'] + ')' if k['set'] else 'CHƯA CÓ (Open WebUI > Săn lead > Cài đặt)'}")
     if k.get("limit_usd"):
@@ -1651,7 +1892,7 @@ def cmd_wait(args):
 
 def cmd_collect(args):
     """Thu tin (khong goi LLM, khong danh dau da doc) ra file, de do va chinh prompt tren cung 1 bo tin."""
-    cfg = owui("GET", "/agent/config")
+    cfg = load_config()
     stats, notes = {}, []
     items = gather(cfg, Budget(cfg), stats, notes, check_seen=not args.all)
     with open(args.out, "w", encoding="utf-8") as f:
@@ -1661,7 +1902,7 @@ def cmd_collect(args):
 
 def cmd_extract(args):
     """Doc 1 file tin bang LLM, in ket qua (khong luu len San lead)."""
-    cfg = owui("GET", "/agent/config")
+    cfg = load_config()
     if args.model:
         cfg["llm"]["model"] = args.model
     with open(args.inp, encoding="utf-8") as f:
@@ -1686,10 +1927,15 @@ def cmd_top(args):
 
 
 def cmd_people(args):
-    cfg = owui("GET", "/agent/config")
-    o = owui("GET", f"/opportunities/{args.opportunity}")
+    cfg = load_config()
     budget = Budget(cfg)
-    people = people_for(cfg, budget, cfg["llm"], [o])
+    if args.opportunity == "all":  # moi co hoi du diem con thieu nguoi (bo qua moc 30 ngay)
+        if os.path.exists(os.path.join(STATE, "people-searched.json")):
+            os.remove(os.path.join(STATE, "people-searched.json"))
+        opps = people_targets(cfg, limit=args.limit)
+    else:
+        opps = [owui("GET", f"/opportunities/{args.opportunity}")]
+    people = people_for(cfg, budget, cfg["llm"], opps)
     if people:
         done = owui("POST", "/agent/people", {"items": people})
         print(f"{len(done['created'])} người mới, {len(done['merged'])} đã có. Chi phí ${budget.spent:.3f}")
@@ -1700,7 +1946,7 @@ def cmd_people(args):
 
 
 def cmd_contacts(args):
-    cfg = owui("GET", "/agent/config")
+    cfg = load_config()
     budget = Budget(cfg)
     opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(args.limit)
     found = find_contacts(cfg, budget, cfg["llm"], opps)
@@ -1708,10 +1954,13 @@ def cmd_contacts(args):
 
 
 def cmd_check_sources(_):
-    cfg = owui("GET", "/agent/config")
-    for page in watch_list(cfg):
-        links = page_links(page)
-        print(f"{'OK ' if links else 'LỖI'} {page['label']}: {len(links) if links is not None else 'không đọc được'} link | {page['url']}")
+    cfg = load_config()
+    pages = watch_list(cfg)
+    with concurrent.futures.ThreadPoolExecutor(FETCH_WORKERS) as pool:
+        for page, links in zip(pages, pool.map(page_links, pages)):
+            useful = sum(1 for x in links or [] if _watch_ok(page, x["title"]))
+            print(f"{'OK ' if links else 'LỖI'} {page['label']}: "
+                  f"{(str(len(links)) + ' link, ' + str(useful) + ' đáng đọc') if links is not None else 'không đọc được'} | {page['url']}")
 
 
 def main():
@@ -1734,7 +1983,8 @@ def main():
     p.add_argument("--limit", type=int, default=10)
     p.set_defaults(f=cmd_top)
     p = sp.add_parser("people")
-    p.add_argument("--opportunity", required=True)
+    p.add_argument("--opportunity", required=True, help="id co hoi, hoac all")
+    p.add_argument("--limit", type=int, default=8)
     p.set_defaults(f=cmd_people)
     p = sp.add_parser("contacts")
     p.add_argument("--opportunity", default="")

@@ -34,8 +34,11 @@ ngành, vùng, nguồn, trần chi phí đều đặt trên trang đó (Cài đ�
 3. **Không đổi cài đặt, key hay trạng thái của sale.** Đó là việc của người dùng trên trang Săn lead (API tự chặn).
 4. **Tôn trọng trần chi phí.** Script tự dừng gọi Apify khi chạm trần mỗi lần quét / mỗi tháng. Không tự nâng trần,
    không chạy `run` nhiều lần liền để "tìm thêm".
-5. Không vượt tường lửa, captcha hay chặn IP của trang nào. Trang chặn máy chủ thì đọc qua Google (`site:`), hoặc bỏ qua.
+5. Không vượt captcha, đăng nhập hay chống bot của trang nào. Cổng `.gov.vn` chặn máy chủ nước ngoài: đọc qua proxy Việt
+   Nam nếu quản trị viên nhập ở Cài đặt (như người dùng ở Việt Nam), không có thì qua Google (`site:`), hoặc bỏ qua.
 6. Thông tin cá nhân: chỉ thông tin công việc công khai (chức danh, công ty, link LinkedIn, liên hệ doanh nghiệp).
+   SĐT / email lấy từ trang của chính công ty, trang tra cứu doanh nghiệp, hoặc thư mời chào giá; mỗi giá trị phải có
+   trong trang nguồn (script kiểm lại). Không đoán email theo mẫu tên, không lấy số fax hay mã số thuế làm SĐT.
 
 ## Lệnh
 
@@ -49,7 +52,8 @@ Chạy từ thư mục skill: `python3 -I scripts/lead.py <lệnh>` (chỉ cần
 | `report [--hours 26]` | Báo cáo cơ hội mới (bảng Markdown) + link trang Săn lead. |
 | `top [--limit 10]` | Cơ hội điểm cao đang ở mục Mới, kèm id. |
 | `people --opportunity <id>` | Tìm người ra quyết định cho 1 cơ hội (tốn Apify). |
-| `check-sources` | Thử từng trang theo dõi: đọc được không, bao nhiêu link. |
+| `contacts [--limit 10]` | Tìm website, SĐT, email, mã số thuế, LinkedIn công ty cho cơ hội chưa có liên hệ (tốn Apify, ~$0.014 / công ty). |
+| `check-sources` | Thử từng trang theo dõi: đọc được không, bao nhiêu link, bao nhiêu link đáng đọc. |
 
 ## Quy trình
 
