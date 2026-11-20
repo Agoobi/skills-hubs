@@ -39,6 +39,8 @@ ngành, vùng, nguồn, trần chi phí đều đặt trên trang đó (Cài đ�
 6. Thông tin cá nhân: chỉ thông tin công việc công khai (chức danh, công ty, link LinkedIn, liên hệ doanh nghiệp).
    SĐT / email lấy từ trang của chính công ty, trang tra cứu doanh nghiệp, hoặc thư mời chào giá; mỗi giá trị phải có
    trong trang nguồn (script kiểm lại). Không đoán email theo mẫu tên, không lấy số fax hay mã số thuế làm SĐT.
+7. **Không xoá dữ liệu** (cơ hội, người liên hệ, lần quét) trừ khi user nói rõ "xoá" trong chính tin nhắn đó.
+   "Chạy lại hết" là quét thêm, không phải xoá.
 
 ## Lệnh
 
@@ -47,45 +49,79 @@ Chạy từ thư mục skill: `python3 -I scripts/lead.py <lệnh>` (chỉ cần
 | Lệnh | Làm gì |
 | --- | --- |
 | `status` | Key Apify, chi phí tháng, LLM, ngành, vùng, nguồn, lần quét gần nhất. Chạy đầu tiên. |
-| `start --trigger chat` | Bắt đầu 1 lần quét **ở nền** (mất 3–10 phút, lâu hơn giới hạn 1 lệnh). In mã lần quét. |
-| `start --full` | Quét đầy đủ: mọi nhóm truy vấn (thiết bị × ngành × tỉnh, ~140 truy vấn Google, chia lô 40) trong 1 lượt, đọc thêm link trang theo dõi, tìm liên hệ cho tối đa 25 cơ hội. Tốn ~$0.6–0.8 Apify; trần 1 lượt nâng lên $1.5, trần tháng giữ nguyên. Dùng lần đầu hoặc khi quét lại từ đầu, không dùng hằng ngày. |
-| `wait <mã>` | Chờ tối đa 170 giây, in tiến độ; xong thì in báo cáo. Chưa xong thì chạy lại `wait <mã>`. |
-| `report [--hours 26]` | Báo cáo cơ hội mới (bảng Markdown) + link trang Săn lead. |
-| `top [--limit 10]` | Cơ hội điểm cao đang ở mục Mới, kèm id. |
-| `people --opportunity <id>` | Tìm người ra quyết định cho 1 cơ hội (tốn Apify). |
-| `contacts [--limit 10]` | Tìm website, SĐT, email, mã số thuế, LinkedIn công ty cho cơ hội chưa có liên hệ (tốn Apify, ~$0.014 / công ty). |
+| `start --trigger chat` | Bắt đầu 1 lần quét **ở nền** (3–10 phút, lâu hơn giới hạn 1 lệnh). In mã lần quét. |
+| `start --full` | Quét đầy đủ: mọi nhóm truy vấn (~140 truy vấn Google, chia lô 40), đọc thêm link trang theo dõi, tìm liên hệ tối đa 25 cơ hội. ~$0.6–0.8 Apify. Chỉ khi user xin "quét lại hết / quét đầy đủ". |
+| `wait <mã>` | Chờ tối đa 170 giây, in tiến độ; xong thì in báo cáo. Chưa xong ("chưa xong") thì chạy lại `wait <mã>`. |
+| `report [--hours 26]` | Báo cáo cơ hội mới còn hạn / tin mới (bảng Markdown, cột Liên hệ) + link trang. |
+| `top [--limit 10]` | Cơ hội điểm cao đang ở mục Mới (còn mới), kèm id. |
+| `audit` | **Đối chiếu từng cơ hội với bài nguồn**: tên công ty, tỉnh, hạn chót, thiết bị "theo nguồn", giá trị, SĐT đầu mối; mời thầu quá hạn / tin cũ còn hiện; thiếu liên hệ. In OK / XEM / LỖI cho từng cơ hội. |
+| `explain <url>` | Đọc **1 link** như lúc quét: giữ hay loại, vì sao, ngày đăng, hạn chót, thiết bị, đầu mối, và trang Săn lead có nhận không. Dùng khi user gửi link hỏi "sao không có". |
+| `contacts [--limit 10] [--all]` | Tìm website, SĐT, email, mã số thuế, người đại diện, LinkedIn công ty cho cơ hội chưa có SĐT / email (`--all`: tìm lại ngay, bỏ mốc 3 ngày). `--opportunity <id>`: 1 cơ hội. ~$0.014–0.03 / công ty. |
+| `people --opportunity <id>` | Tìm người ra quyết định cho 1 cơ hội (`all`: mọi cơ hội đủ điểm còn thiếu người). Tốn Apify. |
 | `check-sources` | Thử từng trang theo dõi: đọc được không, bao nhiêu link, bao nhiêu link đáng đọc. |
 
-## Quy trình
+## Quy trình (làm tới cùng, không bỏ dở)
 
-**User gõ `/tim-lead`, hoặc nói "tìm lead", "quét lead", "tìm khách", "có dự án mới không"...**
+**A. User gõ `/tim-lead`, hoặc "tìm lead", "quét lead", "tìm khách", "có dự án / mời thầu mới không"**
 
-1. `status`. Chưa có key Apify: nói user vào Open WebUI → **Săn lead** → **Cài đặt** → **Key Apify** (lấy ở
-   console.apify.com → Settings → API & Integrations), vẫn quét được Google News và trang theo dõi. "Hàng bên bán" trống:
-   nhắc user ghi để điểm và gợi ý tiếp cận sát hơn.
-2. `start --trigger chat`, rồi `wait <mã>` lặp lại tới khi thấy "Xong lần quét". Báo user ngắn gọn trong lúc chờ.
-3. **Dán nguyên bảng báo cáo** script in ra (giữ link). Thêm 2–3 câu: cơ hội nào đáng gọi trước và vì sao (dựa vào
-   điểm, hạn chót, gợi ý tiếp cận). Không thêm thông tin ngoài bảng.
-4. Lỗi "ví LLM của Hermes hết tiền (402)": báo user nạp ví (trang Ví & hoá đơn của nhà cung cấp LLM) rồi quét lại;
-   tin chưa đọc sẽ được đọc ở lần sau.
+1. `status`. Không có key Apify: nói user vào Săn lead → Cài đặt → Key Apify (vẫn quét được trang theo dõi, Google
+   News). "Hàng bên bán" trống: nhắc user ghi (điểm và thiết bị gợi ý dựa vào đó).
+2. `start --trigger chat` → `wait <mã>` **lặp lại tới khi thấy "Xong lần quét"** (có thể 5–8 lần). Không dừng giữa
+   chừng, không bảo user "chạy lại sau". Báo user 1 câu ngắn mỗi 2–3 lượt chờ.
+3. `audit`. Có **LỖI** thì đọc dòng lỗi, mở link nguồn (`explain <url>` nếu cần) và báo user rõ: cơ hội nào, sai gì,
+   nguồn ghi gì. **THIẾU** liên hệ: chạy `contacts --opportunity <id>` cho từng cơ hội điểm cao còn thiếu (tối đa 5),
+   rồi `report` lại.
+4. Dán **nguyên bảng báo cáo** (giữ link, cột Liên hệ). Thêm 2–3 câu: nên gọi ai trước và vì sao — **mời thầu còn hạn
+   gần nhất trước**, rồi dự án mới điểm cao có SĐT. Không thêm thông tin ngoài bảng / nguồn.
+5. Lần quét báo lỗi:
+   - "ví LLM của Hermes hết tiền (402)": báo user nạp ví (Ví & hoá đơn của nhà cung cấp LLM); tin chưa đọc sẽ đọc ở lần sau.
+   - "gói Apify miễn phí hết lượt" / "chạm trần tháng": báo user; nguồn miễn phí (trang theo dõi, Google News) vẫn chạy.
+     Đổi key / nâng gói ở Săn lead → Cài đặt. Không tự nâng trần.
+   - "0 cơ hội mới": bình thường (tin đã có thì gộp). Vẫn dán bảng các cơ hội còn mới trong 26 giờ.
 
-**User hỏi về 1 cơ hội / muốn tìm người:** `top` lấy id → `people --opportunity <id>` → báo người tìm được (tên, chức
-danh, link LinkedIn, gợi ý tiếp cận). Muốn xem đủ thì mở trang Săn lead.
+**B. User hỏi "sao không có …", gửi 1 link, hoặc nói "rõ ràng có SĐT / có mời thầu"**
 
-**User muốn thêm nguồn / đổi ngành, vùng, trần chi phí:** hướng dẫn sửa trên trang Săn lead → Cài đặt (Trang theo dõi
-thêm, Từ khoá thiết bị thêm, Ngành, Vùng, Giới hạn và chi phí). Agent không tự sửa.
+1. Gửi link: `explain <url>`. Trả lời theo kết quả: đã hết hạn (ghi ngày), tin cũ, ngoài ngành / vùng, không phải thiết
+   bị, trang bị chặn (captcha / chặn IP)… Nếu là cơ hội đúng mà bị loại oan: nói rõ, ghi lại link và lý do để sửa skill.
+2. "Sao không có SĐT / email" cho 1 cơ hội: `top` lấy id → `contacts --opportunity <id>`. Vẫn không có: giải thích nguồn
+   nào đã thử (website công ty, trang tra cứu, đoạn trích Google theo mã số thuế) và vì sao (công ty mới, số bị che,
+   trang tra cứu chặn bằng captcha — **không vượt**). Không bao giờ bịa hay đoán số.
+3. "Thiết bị lấy ở đâu": dòng **"Hạng mục thiết bị (theo nguồn)"** là nguồn ghi; **"Thiết bị gợi ý (AI đoán, nguồn
+   không ghi)"** là đoán từ loại nhà máy, chỉ lấy trong "Hàng bên bán". Nói rõ là đoán.
+4. "Sao toàn tin tức, ít mời thầu": mời thầu thật đến từ đơn vị có phòng lab (trung tâm / viện kiểm nghiệm, trường, chi
+   cục thú y) và vài doanh nghiệp đăng thư mời (Bidiphar, DHG, Domesco, Sochem); doanh nghiệp tư nhân thường hỏi giá trực
+   tiếp nên chỉ thấy qua tin dự án. Gói thầu nhà nước chỉ lấy phần có trên Báo Đấu thầu, trang tổng hợp và web đơn vị. Không đề xuất mua API
+   đấu thầu trả phí (chủ dự án đã quyết không dùng).
+
+**C. User hỏi về 1 cơ hội / muốn tìm người**: `top` lấy id → `people --opportunity <id>` → báo người tìm được (tên, chức
+danh, link LinkedIn, gợi ý tiếp cận). "Đầu mối gián tiếp" là người ở đúng công ty nhưng không ra quyết định.
+
+**D. User muốn thêm nguồn / đổi ngành, vùng, trần chi phí, proxy**: hướng dẫn sửa ở Săn lead → Cài đặt (Trang theo dõi
+thêm, Từ khoá thiết bị thêm, Ngành, Vùng, Giới hạn và chi phí, Proxy Việt Nam). Agent không tự sửa.
+
+**E. User nói "chạy lại hết / quét lại / kiểm tra lại"**: `start --full` → `wait` tới khi xong → `contacts --all` →
+`people --opportunity all` → `audit` → báo cáo. **Không xoá cơ hội, người liên hệ hay dữ liệu nào** — chỉ xoá khi user
+nói rõ "xoá" trong chính tin nhắn đó (sale có trạng thái, ghi chú trên đó).
+
+### Kiểm tra trước khi báo (tự soát)
+
+- Mỗi dòng báo cáo có link nguồn; mời thầu có hạn chót ≥ hôm nay; tin dự án trong "Bỏ tin cũ hơn" (mặc định 30 ngày).
+- SĐT / email trong bảng là của **chính** doanh nghiệp (hoặc phòng mua sắm ghi trong thư mời), không phải của sở, ban
+  xúc tiến, tòa soạn, trang tra cứu. SĐT nhãn "đăng ký kinh doanh" là số đăng ký thuế (có thể là kế toán / dịch vụ).
+- Tỉnh theo tên mới sau 1/7/2025; tên xã giống tên tỉnh (xã Khánh An ở Cà Mau) không phải tỉnh đó.
+- Có gì `audit` báo LỖI mà chưa giải thích được: nói thẳng với user, không giấu.
 
 ## Lệnh `/tim-lead` (cài 1 lần)
 
 - **Open WebUI:** Workspace → Prompts có prompt lệnh `tim-lead` (mọi người dùng xem được). Gõ `/tim-lead`, Enter để
-  chọn, Enter để gửi. Nội dung prompt bảo agent làm đúng quy trình trên.
+  chọn, Enter để gửi. Nội dung prompt (cùng câu với alias dưới) bảo agent làm Quy trình A tới cùng.
 - **Telegram, Coquifly (gateway Hermes):** thêm alias vào `~/.hermes/config.yaml` rồi khởi động lại gateway:
 
 ```yaml
 quick_commands:
   tim-lead:
     type: alias
-    target: "/san-lead-b2b Tìm lead ngay: chạy một lần quét mới (start --trigger chat, rồi wait tới khi xong), dán nguyên bảng báo cáo, thêm 2-3 câu nên liên hệ cơ hội nào trước và vì sao."
+    target: "/san-lead-b2b Tìm lead ngay. Dùng skill san-lead-b2b, làm đúng Quy trình A tới cùng: quét mới (scripts/lead.py start --trigger chat, rồi wait lặp lại tới khi xong), chạy audit, tìm liên hệ (contacts --opportunity) cho cơ hội điểm cao còn thiếu SĐT/email, rồi dán nguyên bảng báo cáo và 2-3 câu nên liên hệ ai trước và vì sao (mời thầu còn hạn gần nhất trước). Báo rõ mọi LỖI audit tìm thấy."
 ```
 
 Cả hai đường đều cần ví LLM của Hermes còn tiền (agent và bước đọc tin đều gọi LLM).

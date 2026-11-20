@@ -22,9 +22,8 @@ không vượt); captcha, đăng nhập, chống bot của bất kỳ trang nào
 
 Muasamcong không có dữ liệu mở / RSS / API công khai (kiểm 18/11/2026; QĐ 1090/QĐ-BTC chỉ kết nối cơ quan nhà nước) và
 Google lập chỉ mục kém; gói thầu nhà nước lấy qua Báo Đấu thầu (trang theo dõi), các trang tổng hợp (`site:` dauthau.asia,
-bidwinner.info, thongtindauthau) và thư mời trên web doanh nghiệp. Muốn ĐỦ gói thầu nhà nước: API trả phí của DauThau.info
-(VINADES; gói API VIP khoảng 15 triệu đồng / năm + điểm theo bản ghi, 1 IP cố định) hoặc chạy phần thu tin trên máy có IP
-Việt Nam — chưa tích hợp, cần chủ dự án chọn.
+bidwinner.info, thongtindauthau) và thư mời trên web doanh nghiệp. Không mua API đấu thầu trả phí
+(chủ dự án đã quyết 20/11/2026): agent không đề xuất cách này.
 
 ## Mời thầu / chào giá: lấy ở đâu
 

@@ -16,6 +16,8 @@ http://127.0.0.1:8080/api/v1/cqf/lead.
     lead.py people --opportunity <id>  tim nguoi ra quyet dinh cho 1 co hoi
     lead.py contacts [--limit 10]      tim website, SDT, email, MST, LinkedIn cong ty cho co hoi chua co lien he
     lead.py check-sources              thu tung trang theo doi (doc duoc khong, bao nhieu link)
+    lead.py audit                      doi chieu tung co hoi voi bai nguon (ten, tinh, han, thiet bi, lien he)
+    lead.py explain <url>              doc 1 link nhu luc quet: giu / loai, vi sao, han chot, thiet bi
 """
 
 import argparse
@@ -1233,7 +1235,7 @@ NEWS_HOSTS = ("vnexpress", "tuoitre", "thanhnien", "baodautu", "cafef", "vietnam
               "plo.vn", "sggp", "laodong", "znews", "nhandan", "qdnd", "vov.vn", "vtv.vn", "vietnamplus", "vietstock",
               "dauthau", "bidwinner", "muasamcong", "thesaigontimes", "doanhnhan", "kinhtedothi", "congthuong", "vnbusiness")
 CONTACTS_PER_RUN = int(os.environ.get("LEAD_CONTACTS_PER_RUN") or (25 if FULL else 10))
-CONTACT_RECHECK_DAYS = 14
+CONTACT_RECHECK_DAYS = 3  # chua co SDT / email: 3 ngay sau tim lai (nguon moi, Google lap chi muc them)
 
 CONTACT_SYSTEM = """Bạn xác minh thông tin liên hệ CÔNG KHAI của một doanh nghiệp Việt Nam cho sale B2B.
 Bạn nhận: công ty mục tiêu và các bằng chứng E0, E1... (mỗi bằng chứng: link trang + đoạn văn bản trên trang đó).
@@ -1424,6 +1426,12 @@ def find_contacts(cfg, budget, llm, opps):
                 log(f"Liên hệ {o['company'][:40]}: lỗi đọc ({error})")
                 continue
             record = check_contact(picked if isinstance(picked, dict) else {}, evidence, o["company"])
+        if not record.get("phones") and (record.get("tax_code") or o.get("company_contact", {}).get("tax_code")):
+            extra = phones_by_tax_code(budget, llm, o, record.get("tax_code") or o["company_contact"]["tax_code"], after)
+            if extra:
+                record["phones"] = extra["phones"]
+                record["emails"] = record.get("emails") or extra.get("emails", [])
+                record["sources"] = record.get("sources", []) + [s for s in extra["sources"] if s not in record.get("sources", [])]
         owui("POST", f"/agent/opportunities/{o['id']}/contact", record)
         got = [f"{len(record.get('phones', []))} SĐT", f"{len(record.get('emails', []))} email"]
         if record.get("website"):
@@ -1474,6 +1482,30 @@ def _name_evidence(url, text, company, width=350):
         out.append({"url": url, "text": re.sub(r"\s+", " ", text[a:b]).strip()})
         start = i + len(core)
     return out
+
+
+def phones_by_tax_code(budget, llm, o, tax_code, after):
+    """SDT dang ky theo ma so thue: doan trich Google cua trang tra cuu (masothue, thuvienphapluat...) thuong ghi
+    'Dien thoai: 03...'. Chi doc doan trich (cac trang do chan may chu bang captcha)."""
+    queries = [f'"{tax_code}"', f'"{core_name(o["company"])}" điện thoại']
+    res = google_search(budget, queries, after)
+    evidence = [{"url": r["url"], "text": f"[Google] {r['title']} | {r['snippet']}"[:400]} for r in res
+                if (tax_code in f"{r['title']} {r['snippet']}" or _names_company(f"{r['title']} {r['snippet']}", o["company"]))
+                and PHONE_RE.search(r["snippet"] or "")][:12]
+    if not evidence:
+        return {}
+    lines = [f"E{n}: {e['url']}\n{e['text']}" for n, e in enumerate(evidence)]
+    user = (f"Công ty mục tiêu: {o['company']} (mã số thuế {tax_code})\n"
+            "Chỉ chọn số điện thoại / email ghi cho ĐÚNG công ty có mã số thuế này.\n\n" + "\n\n".join(lines))
+    try:
+        picked = parse_json(llm_chat(llm, CONTACT_SYSTEM, user, max_tokens=900))
+    except WalletEmpty:
+        raise
+    except (ValueError, RuntimeError):
+        return {}
+    picked = picked if isinstance(picked, dict) else {}
+    out = check_contact({"phones": picked.get("phones"), "emails": picked.get("emails")}, evidence, o["company"])
+    return out if out.get("phones") else {}
 
 
 def check_contact(picked, evidence, company=""):
@@ -1543,7 +1575,7 @@ def check_contact(picked, evidence, company=""):
     return out
 
 
-def contact_targets(limit):
+def contact_targets(limit, recheck=True):
     """Co hoi chua co SDT / email (hoac chua tim), diem cao truoc, bo qua thi thoi, moi co hoi tim lai sau 14 ngay."""
     data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"contact": "can_tim", "sort": "score", "limit": 200,
                                                                    "fresh": "1"}))
@@ -1551,7 +1583,7 @@ def contact_targets(limit):
     out = []
     for o in data["items"]:
         checked = (o.get("company_contact") or {}).get("checked_at") or 0
-        if o["state"] == "bo_qua" or now_ts - checked < CONTACT_RECHECK_DAYS * 86400:
+        if o["state"] == "bo_qua" or (recheck and now_ts - checked < CONTACT_RECHECK_DAYS * 86400):
             continue
         out.append(o)
     return out[:limit]
@@ -2162,9 +2194,112 @@ def cmd_people(args):
 def cmd_contacts(args):
     cfg = load_config()
     budget = Budget(cfg)
-    opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(args.limit)
+    opps = [owui("GET", f"/opportunities/{args.opportunity}")] if args.opportunity else contact_targets(
+        args.limit, recheck=not args.all)
     found = find_contacts(cfg, budget, cfg["llm"], opps)
     print(f"Tìm liên hệ cho {len(opps)} cơ hội: {found} có SĐT / email. Chi phí ${budget.spent:.3f}. {budget.stopped}")
+
+
+def _source_text(o, limit=3):
+    """Toan van toi da 3 bai nguon (bo link Google News chuyen huong), noi lai."""
+    urls, texts = [], []
+    for s in o.get("sources") or []:
+        if "news.google.com" in s["url"] or len(texts) >= limit:
+            continue
+        raw, _ = fetch_text(s["url"])
+        if raw:
+            urls.append(s["url"])
+            texts.append(plain_text(raw))
+    first = urls[0] if urls else (o["sources"][0]["url"] if o.get("sources") else "")
+    return first, "\n".join(texts)
+
+
+def audit_one(o, lookback, provinces=None):
+    """Danh sach van de cua 1 co hoi khi doi chieu voi nguon: (muc, noi dung). muc: LỖI / CẦN XEM / THIẾU."""
+    issues = []
+    url, text = _source_text(o)
+    ftext = fold(text)
+    if not text:
+        issues.append(("CẦN XEM", f"không đọc được bài nguồn ({url[:80]})"))
+    else:
+        words = [w for w in _distinct_words(o["company"]) if len(w) >= 4]
+        if fold(core_name(o["company"])) not in ftext and not any(f" {w} " in f" {ftext} " for w in words):
+            issues.append(("LỖI", "tên doanh nghiệp không có trong bài nguồn"))
+        places = [o.get("province") or "", o.get("province_old") or "", o.get("location") or ""]
+        olds = list((provinces or {}).get(o.get("province") or "", []))
+        if not any(fold(p.replace("TP. ", "")) in ftext for p in places + olds if p):
+            issues.append(("CẦN XEM", f"tỉnh {o.get('province')} (hoặc tên cũ) không thấy trong bài"))
+        if o["kind"] == "moi_thau":
+            found = deadline_in(text)
+            if found and o.get("deadline") and found != o["deadline"]:
+                issues.append(("LỖI", f"hạn chót lưu {o['deadline']} nhưng bài ghi {found}"))
+            if found and not o.get("deadline"):
+                issues.append(("LỖI", f"bài có hạn chót {found} mà chưa lưu"))
+        if o.get("equipment") and not o.get("equipment_inferred"):
+            if not any(fold(e) in ftext or all(w in ftext for w in fold(e).split() if len(w) >= 3) for e in o["equipment"]):
+                issues.append(("LỖI", "thiết bị ghi 'theo nguồn' nhưng không có trong bài"))
+        if o.get("value_text"):
+            digits = re.sub(r"[^\d]", "", o["value_text"])[:4]
+            if digits and digits not in re.sub(r"[^\d]", "", text):
+                issues.append(("CẦN XEM", f"giá trị '{o['value_text']}' không thấy trong bài"))
+        lead = o.get("contact") or {}
+        for p in [x.strip() for x in str(lead.get("phone") or "").split(",") if x.strip()]:
+            if phone_digits(p) not in {phone_digits(m.group(0)) for m in PHONE_RE.finditer(text)}:
+                issues.append(("CẦN XEM", f"SĐT đầu mối {p} không thấy trong bài"))
+    if o.get("deadline") and o["deadline"] < today().isoformat():
+        issues.append(("LỖI", f"mời thầu đã hết hạn ({o['deadline']}) mà vẫn hiện"))
+    if o.get("published_at"):
+        age = (time.time() - o["published_at"]) / 86400
+        if age > lookback and not (o.get("deadline") and o["deadline"] >= today().isoformat()):
+            issues.append(("LỖI", f"tin cũ {int(age)} ngày (ngưỡng {lookback}) mà vẫn hiện"))
+    cc = o.get("company_contact") or {}
+    for p in cc.get("phones", []):
+        if not p.get("url"):
+            issues.append(("LỖI", f"SĐT {p['value']} không có link nguồn"))
+    if not (o.get("contact_counts") or {}).get("phones") and not (o.get("contact_counts") or {}).get("emails"):
+        issues.append(("THIẾU", "chưa có SĐT / email (chạy contacts --opportunity <id>)"))
+    return issues
+
+
+def cmd_audit(args):
+    cfg = load_config()
+    lookback = int(cfg["settings"].get("lookback_days") or 30)
+    data = owui("GET", "/opportunities?" + urllib.parse.urlencode({"fresh": "1", "sort": "score", "limit": args.limit}))
+    bad = 0
+    for o in data["items"]:
+        o = owui("GET", f"/opportunities/{o['id']}")
+        issues = audit_one(o, lookback, {**cfg.get("other_provinces", {}), **cfg["provinces"]})
+        mark = "OK " if not issues else ("LỖI" if any(i[0] == "LỖI" for i in issues) else "XEM")
+        bad += bool(issues and mark == "LỖI")
+        print(f"{mark} {o['score']:>3} | {o['company'][:55]} | {o['kind_label']} | id {o['id']}")
+        for level, msg in issues:
+            print(f"      - {level}: {msg}")
+    print(f"\nĐã kiểm {len(data['items'])} cơ hội, {bad} có LỖI. LỖI: sửa hoặc báo người dùng; THIẾU: chạy contacts.")
+
+
+def cmd_explain(args):
+    """Doc 1 link nhu luc quet, in ket qua doc tin (giu / loai, ly do, ngay, han, thiet bi) - de tra loi 'vi sao'."""
+    cfg = load_config()
+    s = cfg["settings"]
+    raw, final = fetch_text(args.url)
+    if not raw:
+        print(f"Không đọc được trang (bị chặn, captcha, hoặc lỗi mạng): {args.url}")
+        return
+    full = plain_text(raw)
+    item = {"origin": "Kiểm tra tay", "url": final or args.url, "title": re.sub(r"\s+", " ", (re.search(
+        r"(?is)<title[^>]*>(.*?)</title>", raw) or [None, ""])[1]).strip()[:200], "snippet": "", "hint": "",
+        "text": main_text(raw), "contact_hint": contact_lines(full), "deadline_hint": deadline_in(full),
+        "date": page_date(raw) or text_date(full[:400])}
+    res = extract_batch(cfg["llm"], s["seller"], [item], region_text(cfg), int(s.get("lookback_days") or 30)).get(0) or {}
+    print(f"Ngày trang: {item['date'] or '?'} | hạn chót đọc được: {item['deadline_hint'] or '?'}")
+    print(f"Kết luận đọc tin: {'GIỮ' if res.get('keep') else 'LOẠI'} - {res.get('reason')}")
+    if res.get("keep") and isinstance(res.get("opportunity"), dict):
+        o = normalise(res["opportunity"], item)
+        print(json.dumps({k: o.get(k) for k in ("company", "kind", "industry", "province", "title", "deadline", "published",
+                                                 "event_date", "value", "equipment", "equipment_inferred", "contact")},
+                         ensure_ascii=False, indent=1))
+        if o.get("kind") == "moi_thau" and o.get("deadline") and o["deadline"] < today().isoformat():
+            print(f"=> Trang Săn lead sẽ KHÔNG nhận: mời thầu đã hết hạn ({o['deadline']}).")
 
 
 def cmd_check_sources(_):
@@ -2204,7 +2339,14 @@ def main():
     p = sp.add_parser("contacts")
     p.add_argument("--opportunity", default="")
     p.add_argument("--limit", type=int, default=CONTACTS_PER_RUN)
+    p.add_argument("--all", action="store_true", help="tim lai ngay ca co hoi vua tim (bo qua moc 3 ngay)")
     p.set_defaults(f=cmd_contacts)
+    p = sp.add_parser("audit")
+    p.add_argument("--limit", type=int, default=50)
+    p.set_defaults(f=cmd_audit)
+    p = sp.add_parser("explain")
+    p.add_argument("url")
+    p.set_defaults(f=cmd_explain)
     sp.add_parser("check-sources").set_defaults(f=cmd_check_sources)
     p = sp.add_parser("collect")
     p.add_argument("--out", required=True)
