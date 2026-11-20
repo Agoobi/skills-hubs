@@ -90,7 +90,8 @@ Chạy từ thư mục skill: `python3 -I scripts/lead.py <lệnh>` (chỉ cần
    không ghi)"** là đoán từ loại nhà máy, chỉ lấy trong "Hàng bên bán". Nói rõ là đoán.
 4. "Sao toàn tin tức, ít mời thầu": mời thầu thật đến từ đơn vị có phòng lab (trung tâm / viện kiểm nghiệm, trường, chi
    cục thú y) và vài doanh nghiệp đăng thư mời (Bidiphar, DHG, Domesco, Sochem); doanh nghiệp tư nhân thường hỏi giá trực
-   tiếp nên chỉ thấy qua tin dự án. Gói nhà nước đầy đủ nằm trên muasamcong: cần API đấu thầu trả phí (DauThau.info).
+   tiếp nên chỉ thấy qua tin dự án. Gói thầu nhà nước chỉ lấy phần có trên Báo Đấu thầu, trang tổng hợp và web đơn vị. Không đề xuất mua API
+   đấu thầu trả phí (chủ dự án đã quyết không dùng).
 
 **C. User hỏi về 1 cơ hội / muốn tìm người**: `top` lấy id → `people --opportunity <id>` → báo người tìm được (tên, chức
 danh, link LinkedIn, gợi ý tiếp cận). "Đầu mối gián tiếp" là người ở đúng công ty nhưng không ra quyết định.
