@@ -21,4 +21,6 @@
 | `LOI: HTTPS chua len` | Cổng 80/443 chưa mở ở firewall nhà cung cấp VPS, hoặc DNS sslip.io chưa phân giải | Mở 80/443; `docker logs caddy`; thử lại sau 1–2 phút |
 | `LOI: khong dang nhap duoc admin Open WebUI` | Volume `open-webui` có sẵn admin khác (cài lần trước) | `docker rm -f open-webui; docker volume rm open-webui` rồi chạy lại (mất lịch sử chat) |
 | Open WebUI không thấy model `hermes-agent` | Khoá API server lệch | Chạy lại setup (script đồng bộ `API_SERVER_KEY` vào cả hai) |
+| `git is required` / `LOI: cai Hermes that bai` trên AlmaLinux, Rocky, CentOS | VPS tối giản chưa có `git` | Từ bản 0.2.1 `remote.sh` tự cài `git`, `curl`, `python3` bằng `apt`/`dnf`/`yum`. Bản cũ: `ssh <vps> 'dnf install -y git curl tar xz'` rồi chạy lại |
+| `LOI: cai goi can thiet that bai` | Mạng VPS không tới kho gói, hoặc `dnf`/`apt` đang bị khoá | `cat /tmp/prereq-install.log` trên VPS; đợi tiến trình cập nhật tự động xong rồi chạy lại |
 

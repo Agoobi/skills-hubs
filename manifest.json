@@ -135,7 +135,7 @@
       "category": "operations",
       "icon": "server",
       "tags": ["hermes", "vps", "setup", "telegram", "openrouter", "zernio", "onboarding", "open-webui"],
-      "version": "0.2.0",
+      "version": "0.2.1",
       "agents": ["hermes"],
       "requires": { "toolsets": ["terminal"], "env": [] },
       "featured": false
