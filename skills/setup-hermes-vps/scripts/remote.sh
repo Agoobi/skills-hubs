@@ -4,6 +4,23 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 HUB_URL="https://github.com/Agoobi/skills-hubs"
 
+# --- Goi can co san: git, curl, python3 (VPS toi gian, nhat la AlmaLinux/Rocky, thuong thieu git) ---
+need=""
+for c in git curl python3; do command -v "$c" >/dev/null || need="$need $c"; done
+if [ -n "$need" ]; then
+  echo "  Cai goi con thieu:$need"
+  if command -v apt-get >/dev/null; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq >/tmp/prereq-install.log 2>&1 \
+      && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $need ca-certificates tar xz-utils >>/tmp/prereq-install.log 2>&1
+  elif command -v dnf >/dev/null; then
+    dnf install -y $need tar xz >/tmp/prereq-install.log 2>&1
+  elif command -v yum >/dev/null; then
+    yum install -y $need tar xz >/tmp/prereq-install.log 2>&1
+  else
+    echo "LOI: VPS khong co apt/dnf/yum, hay tu cai$need roi chay lai"; exit 1
+  fi || { tail -20 /tmp/prereq-install.log; echo "LOI: cai goi can thiet that bai:$need"; exit 1; }
+fi
+
 if ! command -v hermes >/dev/null; then
   echo "  Cai Hermes Agent (vai phut)..."
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup >/tmp/hermes-install.log 2>&1 \

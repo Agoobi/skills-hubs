@@ -1,7 +1,7 @@
 ---
 name: setup-hermes-vps
 description: Cài Hermes lên VPS khách: Telegram (yên lặng), OpenRouter, Zernio, Open WebUI.
-version: 0.2.0
+version: 0.2.1
 author: Agoobi
 license: MIT
 metadata:
@@ -28,7 +28,7 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 
 | Biến | Bắt buộc | Ghi chú |
 |---|---|---|
-| `VPS_HOST` | có | IP VPS (Ubuntu 22.04/24.04, ≥2 GB RAM) |
+| `VPS_HOST` | có | IP VPS (Ubuntu 22.04/24.04 hoặc AlmaLinux/Rocky 9, ≥2 GB RAM; script tự cài git/curl/python3 nếu thiếu) |
 | `VPS_USER` / `VPS_PORT` | không | mặc định `root` / `22` |
 | `VPS_PASSWORD` | lần đầu | để cài SSH key; đã vào được bằng key thì bỏ trống |
 | `OPENROUTER_API_KEY` | có | `sk-or-v1-...` |
