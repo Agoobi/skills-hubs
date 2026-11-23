@@ -23,4 +23,9 @@
 | Open WebUI không thấy model `hermes-agent` | Khoá API server lệch | Chạy lại setup (script đồng bộ `API_SERVER_KEY` vào cả hai) |
 | `git is required` / `LOI: cai Hermes that bai` trên AlmaLinux, Rocky, CentOS | VPS tối giản chưa có `git` | Từ bản 0.2.1 `remote.sh` tự cài `git`, `curl`, `python3` bằng `apt`/`dnf`/`yum`. Bản cũ: `ssh <vps> 'dnf install -y git curl tar xz'` rồi chạy lại |
 | `LOI: cai goi can thiet that bai` | Mạng VPS không tới kho gói, hoặc `dnf`/`apt` đang bị khoá | `cat /tmp/prereq-install.log` trên VPS; đợi tiến trình cập nhật tự động xong rồi chạy lại |
-
+| `Unauthorized user: <uid> on zalo` trong gateway.log | uid chưa có trong `ZALO_ALLOWED_USERS` (Hermes mặc định chặn người lạ) | Thêm uid vào `CUSTOMER_ZALO_IDS`, chạy lại; người đó nhắn lại |
+| Zalo `health` có `sessionDead:true`, `code=1006` rồi `cookie login failed` | Zalo huỷ phiên: nick phụ mở Zalo Web/PC ở nơi khác, hoặc đăng nhập 2 lần liên tiếp | Đăng xuất Zalo Web/PC của nick phụ, chạy lại setup (`ZALO=1`) để lấy QR mới |
+| Người dùng nói đã quét nhưng không vào, log toàn `QR expired; regenerating` | Quét trúng QR cũ, hoặc 2 tiến trình cùng ghi `qr.png` (`login.mjs` chạy chồng service) | `pkill -f "hermes-zalo-plugin/(install\|login).mjs"; systemctl --user restart com.hermes.zaloplugin`, gửi QR mới. Script từ 0.3.0 đã tự làm |
+| `Zalo plugin is running but not logged in` khi gateway khởi động | Bridge chưa đăng nhập / đang chờ quét | Quét QR; gateway tự thử lại mỗi phút, hoặc `systemctl --user restart hermes-gateway` |
+| Bot im trong nhóm Zalo | `ZALO_GROUP_MODE=mention` mà không @tag/reply, hoặc người tag chưa có trong danh sách | @tag đúng nick phụ; thêm uid người đó |
+| (máy vận hành, Git Bash) tải file từ VPS báo không có file dù có | Git Bash đổi `/root/...` thành `C:/Program Files/Git/root/...` | Thêm `MSYS_NO_PATHCONV=1` trước lệnh, hoặc dùng đường dẫn tương đối (`.hermes-zalo/qr.png`) như setup.sh |

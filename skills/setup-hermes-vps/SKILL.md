@@ -1,20 +1,20 @@
 ---
 name: setup-hermes-vps
-description: Cài Hermes lên VPS khách: Telegram (yên lặng), OpenRouter, Zernio, Open WebUI.
-version: 0.2.1
+description: Cài Hermes lên VPS khách: Telegram (yên lặng) và/hoặc Zalo cá nhân (nick phụ, quét QR), OpenRouter, Zernio, Open WebUI.
+version: 0.3.0
 author: Agoobi
 license: MIT
 metadata:
   hermes:
     category: coquifly
-    tags: [hermes, vps, setup, telegram, openrouter, zernio, onboarding, vietnamese]
+    tags: [hermes, vps, setup, telegram, zalo, openrouter, zernio, onboarding, vietnamese]
 ---
 
 # setup-hermes-vps
 
-Bàn giao một con bot Hermes cho khách trên VPS riêng của khách, chỉ bằng một lệnh: cài SSH key → cài Hermes Agent → model qua OpenRouter (chat + tạo ảnh) → bot Telegram chạy nền 24/7 chỉ cho đúng người dùng → bot chỉ gửi **một tin kết quả**, không nhắn từng bước khi đang think → cài skill từ hub (mặc định `chay-quang-cao-facebook` qua Zernio) → cài **Open WebUI** có HTTPS tại `https://<ip-gạch-ngang>.sslip.io` → kiểm tra thật rồi báo kết quả.
+Bàn giao một con bot Hermes cho khách trên VPS riêng của khách, chỉ bằng một lệnh: cài SSH key → cài Hermes Agent → model qua OpenRouter (chat + tạo ảnh) → bot Telegram chạy nền 24/7 chỉ cho đúng người dùng → bot chỉ gửi **một tin kết quả**, không nhắn từng bước khi đang think → cài skill từ hub (mặc định `chay-quang-cao-facebook` qua Zernio) → (tuỳ chọn `ZALO=1`) gắn **Zalo cá nhân** của khách (nick phụ) qua `hermes-zalo-plugin`, gửi QR cho người dùng quét → cài **Open WebUI** có HTTPS tại `https://<ip-gạch-ngang>.sslip.io` → kiểm tra thật rồi báo kết quả.
 
-Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "bàn giao bot", đưa IP VPS + key, hoặc muốn thêm/bớt Telegram ID, đổi model, cập nhật skill trên một VPS đã cài.
+Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "bàn giao bot", đưa IP VPS + key, "setup zalo cá nhân", "khách có nick phụ Zalo", hoặc muốn thêm/bớt Telegram ID / uid Zalo, đổi model, cập nhật skill trên một VPS đã cài.
 
 ## Quy tắc
 
@@ -23,6 +23,8 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 3. **Mỗi VPS một bot Telegram riêng.** Một token chạy ở hai nơi thì hai nơi giành tin nhắn của nhau. Nếu người dùng đưa token đã dùng cho khách khác thì cảnh báo trước.
 4. **Chỉ báo "xong" khi script in `XONG`.** Lỗi thì báo nguyên văn dòng `LOI:` và cách sửa, không đoán.
 5. Không đụng vào quảng cáo của khách: setup chỉ đọc (`check`, `accounts`), không tạo/bật camp.
+6. **Zalo uid mặc định luôn có:** `407658771750743625` (người vận hành). Script tự thêm vào `ZALO_ALLOWED_USERS`, không bao giờ bỏ. uid của khách thì thêm sau, khi khách nhắn thử (xem "Việc hay gặp").
+7. **Zalo: gửi QR cho người dùng ngay khi script in `ZALO_QR: <file>`** (gửi file ảnh, không mô tả). QR sống ~1–2 phút, bridge tự làm mới; mỗi lần có dòng `ZALO_QR:` mới là QR đã đổi, gửi lại. Người dùng báo "đã quét" nhưng script chưa in `Da quet QR` thì chưa vào: kiểm tra `~/.hermes-zalo/bridge.log` trên VPS, không tin lời báo.
 
 ## Đầu vào cần hỏi (gom một lượt)
 
@@ -32,7 +34,7 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 | `VPS_USER` / `VPS_PORT` | không | mặc định `root` / `22` |
 | `VPS_PASSWORD` | lần đầu | để cài SSH key; đã vào được bằng key thì bỏ trống |
 | `OPENROUTER_API_KEY` | có | `sk-or-v1-...` |
-| `TELEGRAM_BOT_TOKEN` | có | bot riêng cho khách này (tạo qua @BotFather) |
+| `TELEGRAM_BOT_TOKEN` | có, trừ khi `ZALO=1` | bot riêng cho khách này (tạo qua @BotFather). Chỉ làm Zalo thì để trống |
 | `CUSTOMER_TELEGRAM_IDS` | không | ID của khách, cách nhau dấu phẩy. Khách lấy ID qua @userinfobot |
 | `ZERNIO_API_KEY` | có nếu cài skill quảng cáo | `sk_...`, khách đã kết nối Meta Ads trong Zernio |
 | `CHAT_MODEL` | không | mặc định `deepseek/deepseek-v4.1-flash` |
@@ -41,6 +43,9 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 | `OPENWEBUI` | không | mặc định `1`: cài Open WebUI. `0` để bỏ qua |
 | `OPENWEBUI_DOMAIN` | không | mặc định `<ip-gạch-ngang>.sslip.io` (vd `151-246-182-155.sslip.io`). Đặt tên miền riêng nếu đã trỏ DNS |
 | `TELEGRAM_QUIET` | không | mặc định `1`: bot Telegram chỉ gửi 1 tin kết quả. `0` để về mặc định của Hermes |
+| `ZALO` | không | `1` = gắn Zalo cá nhân (nick phụ của khách). Mặc định `0` |
+| `CUSTOMER_ZALO_IDS` | không | uid Zalo (số dài, không phải SĐT) của người được nhắn bot, cách nhau dấu phẩy. `407658771750743625` luôn được thêm |
+| `ZALO_GROUP_MODE` | không | mặc định `mention`: trong nhóm chỉ trả lời khi được @tag / reply. `all` = mọi tin, `off` = chỉ chat riêng |
 
 ## Cách chạy
 
@@ -68,9 +73,25 @@ Mật khẩu có ký tự `#`, `!`: đặt trong dấu nháy đơn trong file en
 5. Báo link Open WebUI. Tài khoản admin do script tạo, lưu ở `~/.hermes/openwebui.env` trên VPS (`ssh <vps> 'cat ~/.hermes/openwebui.env'`), đăng ký mở cửa đã tắt. Không in mật khẩu admin ra chat, chỉ chỉ đường lấy.
 6. Nhắc đổi mật khẩu root của VPS nếu mật khẩu đã gửi qua chat.
 
+## Zalo cá nhân (`ZALO=1`)
+
+Dùng [hermes-zalo-plugin](https://github.com/cuongdev/hermes-zalo-plugin) (zca-js, API Zalo **không chính thức**): bridge Node chạy service `com.hermes.zaloplugin` (systemd user) nghe `127.0.0.1:8787`, Hermes nối vào bằng adapter `zalo-platform`. Plugin chính thức `zalo-platform` trong catalog Hermes là Zalo **Bot** (bot.zaloplatforms.com), không chạy được trên nick cá nhân.
+
+Luồng trong `setup.sh`, sau bước Telegram/Open WebUI:
+1. `zalo.sh prepare`: cài Node 22 + plugin, ghi `ZALO_*` vào `~/.hermes/.env`, cài service bridge (`setup --service-only`), bridge tự ra QR.
+2. Script tải QR về cạnh file env (`<ten-khach>-zalo-qr.png`), in `ZALO_QR: <file>` → **gửi file đó cho người dùng ngay**. QR đổi thì tải lại và in dòng mới.
+3. Người dùng mở Zalo **trên nick phụ** → Quét QR → xác nhận trên điện thoại. Script in `Da quet QR`.
+4. `zalo.sh finish`: restart gateway, chờ log `Zalo: connected`.
+
+Nhắc khách: **đăng xuất Zalo Web/PC của nick phụ trước khi quét và đừng mở lại**, không thì phiên bot bị đá, phải quét lại. Zalo có thể khoá nick tự động hoá, vì vậy chỉ dùng nick phụ.
+
+Không chạy `hermes-zalo-plugin setup` (không cờ) bằng tay: nó chạy `login.mjs` đăng nhập một lần rồi thoát, service đăng nhập lần nữa; chạy chồng với service thì hai tiến trình cùng ghi `qr.png`, QR đổi giữa chừng, quét không vào.
+
 ## Việc hay gặp sau này
 
 - **Thêm/bớt Telegram ID, đổi model, đổi key, thêm skill:** sửa file env của khách rồi chạy lại bước 3. Script ghi đè giá trị cũ, giữ `settings.json` của skill.
+- **Thêm khách Zalo:** nhờ khách nhắn (hoặc @tag nick phụ trong nhóm) một tin, rồi `ssh <vps> 'grep -h "Zalo inbound" ~/.hermes/logs/gateway.log | tail -5'` → lấy `uid=...` (đúng `name=`), thêm vào `CUSTOMER_ZALO_IDS`, chạy lại bước 3. Nhanh: `sed -i 's|^ZALO_ALLOWED_USERS=.*|ZALO_ALLOWED_USERS=<uid1>,<uid2>|' ~/.hermes/.env && systemctl --user restart hermes-gateway`. Tin gửi trước khi được thêm không được xử lý lại, khách phải nhắn lại.
+- **Zalo mất đăng nhập** (`curl -s 127.0.0.1:8787/health` có `loggedIn:false`): chạy lại bước 3 với `ZALO=1`, script tự thử cookie cũ, không được thì gửi QR mới. Lý do rớt: `tail ~/.hermes-zalo/bridge.log`.
 - **Ai đã nhắn bot:** `ssh <vps> 'grep -h "inbound message: platform=telegram" ~/.hermes/logs/gateway.log* | tail -20; grep -h "Blocked unauthorized" ~/.hermes/logs/gateway.log* | tail'`. Người bị chặn trước khi được thêm phải nhắn lại.
 - **Bot nhắn quá nhiều khi đang think:** đã tắt sẵn (`TELEGRAM_QUIET=1`: tắt tin giữa chừng, nhật ký tool, lý luận; tiến độ gom thành 1 bong bóng "⏳ Working" tự xoá khi xong; `SOUL.md` dặn nhắn một lần). Muốn xem lại: `ssh <vps> 'hermes config show | grep -A10 telegram'`. Muốn bật lại tin giữa chừng cho một VPS: `hermes config set display.platforms.telegram.interim_assistant_messages true` rồi `systemctl --user restart hermes-gateway`.
 - **Open WebUI không mở / HTTPS lỗi:** `ssh <vps> 'docker logs --tail 30 open-webui; docker logs --tail 30 caddy'`. Cổng 80/443 phải mở ở firewall nhà cung cấp VPS (Let's Encrypt cần).
