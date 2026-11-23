@@ -5,7 +5,9 @@
 set -euo pipefail
 
 DEFAULT_TELEGRAM_IDS="6005640491,9227652557"
-DEFAULT_ZALO_IDS="407658771750743625"   # uid Zalo nguoi van hanh, luon duoc nhan bot
+# SDT Zalo nguoi van hanh, luon duoc nhan bot. Dung SDT, KHONG dung uid: uid Zalo tuong doi theo tung
+# nick (cung 1 nguoi, 2 nick phu thay 2 uid khac nhau); zalo.sh tra uid tu SDT qua chinh nick phu.
+DEFAULT_ZALO_PHONES=""
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 die() { echo "LOI: $*" >&2; exit 1; }
@@ -33,7 +35,9 @@ case ",$SKILLS," in *,chay-quang-cao-facebook,*) [ -n "${ZERNIO_API_KEY:-}" ] ||
 
 # Gop ID mac dinh + ID khach, bo trung, chi giu so.
 ALLOWED_IDS="$(echo "$DEFAULT_TELEGRAM_IDS,${CUSTOMER_TELEGRAM_IDS:-}" | tr -s ', ' '\n' | grep -E '^[0-9]+$' | awk '!s[$0]++' | paste -sd, -)"
-ZALO_IDS="$(echo "$DEFAULT_ZALO_IDS,${CUSTOMER_ZALO_IDS:-}" | tr -s ', ' '\n' | grep -E '^[0-9]+$' | awk '!s[$0]++' | paste -sd, -)"
+normcsv() { echo "$1" | tr -s ', ' '\n' | grep -E '^[0-9]+$' | awk '!s[$0]++' | paste -sd, - || true; }
+ZALO_PHONES="$(normcsv "$DEFAULT_ZALO_PHONES,${CUSTOMER_ZALO_PHONES:-}")"
+ZALO_IDS="$(normcsv "${CUSTOMER_ZALO_IDS:-}")"   # uid chi dung cho DUNG nick phu nay (lay tu log cua VPS nay)
 
 step "1/5 Kiem tra key truoc khi dong vao VPS"
 OR_JSON="$(curl -fsS https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OPENROUTER_API_KEY")" \
@@ -50,7 +54,7 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
 else
   echo "  Telegram: bo qua (khong co token)"
 fi
-[ "$ZALO" = "1" ] && echo "  Zalo: uid duoc nhan bot: $ZALO_IDS | nhom: ${ZALO_GROUP_MODE:-mention}"
+if [ "$ZALO" = "1" ]; then echo "  Zalo: SDT duoc nhan bot: ${ZALO_PHONES:-(chua co)} | uid: ${ZALO_IDS:-(chua co)} | nhom: ${ZALO_GROUP_MODE:-mention}"; fi
 for m in "$CHAT_MODEL" "$IMAGE_MODEL"; do
   curl -fsS https://openrouter.ai/api/v1/models | python3 -c 'import json,sys
 ids={m["id"] for m in json.load(sys.stdin)["data"]}; m=sys.argv[1]
@@ -85,8 +89,43 @@ ssh "${SSH_OPTS[@]}" "$TARGET" '. /etc/os-release; echo "  VPS: $PRETTY_NAME, RA
 
 [ "$CHECK_ONLY" = "--check-only" ] && { echo; echo "--check-only: dung o day, chua cai gi."; exit 0; }
 
-step "3-5/5 Cai Hermes, cau hinh, bat gateway (chay tren VPS)"
 q() { printf '%q' "$1"; }
+
+# --- Zalo: QR TRUOC khi cai Hermes (bridge khong can Hermes) de nguoi dung quet trong luc cai ---
+QR_WATCH_PID=""
+if [ "$ZALO" = "1" ]; then
+  step "Zalo ca nhan: cai bridge, ra QR (truoc khi cai Hermes)"
+  zremote() {
+    { echo "export ZALO_STAGE=$1 ZALO_IDS=$(q "$ZALO_IDS") ZALO_PHONES=$(q "$ZALO_PHONES") ZALO_GROUP_MODE=$(q "${ZALO_GROUP_MODE:-mention}") ZALO_PLUGIN_VERSION=$(q "${ZALO_PLUGIN_VERSION:-1.0.12}")"
+      cat "$HERE/zalo.sh"; } | tr -d '\r' | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
+  }
+  QR_OUT="${ENV_FILE%.env}-zalo-qr.png"
+  # Canh QR: moi lan bridge lam moi QR thi tai ve va in "ZALO_QR: <file>" (agent gui file do cho nguoi dung).
+  qr_watch() {
+    local last="" st mt
+    while :; do
+      read -r _ st mt <<<"$(zremote status 2>/dev/null || echo "x err 0")"
+      if [ "$st" = "logged_in" ]; then echo "ZALO_SCANNED: da quet QR, Zalo dang nhap xong ($(date +%T))"; return 0; fi
+      if [ "${mt:-0}" != "0" ] && [ "$mt" != "$last" ]; then
+        scp -q -P "$VPS_PORT" -o StrictHostKeyChecking=accept-new "$TARGET:.hermes-zalo/qr.png" "$QR_OUT" \
+          && echo "ZALO_QR: $QR_OUT ($(date +%T)) <- gui file nay cho nguoi dung NGAY"
+        last="$mt"
+      fi
+      sleep 3
+    done
+  }
+  OUT="$(zremote prepare)" || { echo "$OUT"; die "chuan bi Zalo that bai"; }
+  echo "$OUT" | grep -v '^ZALO_' || true
+  if echo "$OUT" | grep -q ZALO_QR_READY; then
+    echo "  QR song ~1-2 phut, bridge tu lam moi. Nguoi dung quet bang app Zalo cua NICK PHU (dang xuat Zalo Web/PC cua nick phu truoc)."
+    qr_watch & QR_WATCH_PID=$!
+    trap '[ -n "$QR_WATCH_PID" ] && kill "$QR_WATCH_PID" 2>/dev/null || true' EXIT
+  else
+    echo "  Zalo da dang nhap san, khong can quet"
+  fi
+fi
+
+step "3-5/5 Cai Hermes, cau hinh, bat gateway (chay tren VPS)"
 {
   echo "export OPENROUTER_API_KEY=$(q "$OPENROUTER_API_KEY")"
   echo "export TELEGRAM_BOT_TOKEN=$(q "${TELEGRAM_BOT_TOKEN:-}")"
@@ -100,29 +139,17 @@ q() { printf '%q' "$1"; }
 } | tr -d '\r' | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
 
 if [ "$ZALO" = "1" ]; then
-  step "Zalo ca nhan: cai bridge, dang nhap QR"
-  zremote() {
-    { echo "export ZALO_STAGE=$1 ZALO_IDS=$(q "$ZALO_IDS") ZALO_GROUP_MODE=$(q "${ZALO_GROUP_MODE:-mention}") ZALO_PLUGIN_VERSION=$(q "${ZALO_PLUGIN_VERSION:-1.0.12}")"
-      cat "$HERE/zalo.sh"; } | tr -d '\r' | ssh "${SSH_OPTS[@]}" "$TARGET" 'bash -s'
-  }
-  OUT="$(zremote prepare)" || { echo "$OUT"; die "chuan bi Zalo that bai"; }
-  echo "$OUT" | grep -v '^ZALO_' || true
-  if echo "$OUT" | grep -q ZALO_QR_READY; then
-    QR_OUT="${ENV_FILE%.env}-zalo-qr.png"; LAST=""; DEADLINE=$(( $(date +%s) + ${ZALO_QR_WAIT:-900} ))
-    echo "  Gui file QR cho nguoi dung NGAY (QR song ~1-2 phut, bridge tu lam moi). Quet bang app Zalo cua NICK PHU."
-    while :; do
-      read -r _ STATE MTIME <<<"$(zremote status)"
-      [ "$STATE" = "logged_in" ] && { echo "  Da quet QR, Zalo dang nhap xong"; break; }
-      if [ "${MTIME:-0}" != "0" ] && [ "$MTIME" != "$LAST" ]; then
-        scp -q -P "$VPS_PORT" -o StrictHostKeyChecking=accept-new "$TARGET:.hermes-zalo/qr.png" "$QR_OUT" \
-          && echo "ZALO_QR: $QR_OUT ($(date +%T)) <- QR moi, gui lai cho nguoi dung"
-        LAST="$MTIME"
-      fi
+  step "Zalo ca nhan: cho quet QR, noi gateway"
+  if [ -n "$QR_WATCH_PID" ] && kill -0 "$QR_WATCH_PID" 2>/dev/null; then
+    DEADLINE=$(( $(date +%s) + ${ZALO_QR_WAIT:-900} ))
+    while kill -0 "$QR_WATCH_PID" 2>/dev/null; do
       [ "$(date +%s)" -lt "$DEADLINE" ] || die "het ${ZALO_QR_WAIT:-900}s chua quet QR. Chay lai setup de lay QR moi"
-      sleep 3
+      sleep 2
     done
   fi
+  QR_WATCH_PID=""
   zremote finish || die "noi gateway voi Zalo that bai"
+  rm -f "$QR_OUT"
 fi
 
 echo
@@ -131,7 +158,7 @@ if [ -n "$BOT_USERNAME" ]; then
   echo "Telegram: @$BOT_USERNAME | ID duoc dung: $ALLOWED_IDS"
   echo "Nhan khach mo t.me/$BOT_USERNAME va bam Start."
 fi
-if [ "$ZALO" = "1" ]; then echo "Zalo: uid duoc nhan bot: $ZALO_IDS. Them khach: ho nhan 1 tin vao nick phu, lay uid trong log, them vao CUSTOMER_ZALO_IDS roi chay lai."; fi
+if [ "$ZALO" = "1" ]; then echo "Zalo: them nguoi duoc nhan bot: bash scripts/zalo-allow.sh $ENV_FILE (xem ai vua nhan) roi bash scripts/zalo-allow.sh $ENV_FILE <uid>"; fi
 if [ "$OPENWEBUI" = "1" ]; then
   OW_DOMAIN="${OPENWEBUI_DOMAIN:-$(echo "$VPS_HOST" | tr . -).sslip.io}"
   echo "Open WebUI: https://$OW_DOMAIN (tai khoan admin: ssh $TARGET 'cat ~/.hermes/openwebui.env')"

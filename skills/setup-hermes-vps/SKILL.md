@@ -1,7 +1,7 @@
 ---
 name: setup-hermes-vps
 description: Cài Hermes lên VPS khách: Telegram (yên lặng) và/hoặc Zalo cá nhân (nick phụ, quét QR), OpenRouter, Zernio, Open WebUI.
-version: 0.3.0
+version: 0.3.1
 author: Agoobi
 license: MIT
 metadata:
@@ -23,8 +23,8 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 3. **Mỗi VPS một bot Telegram riêng.** Một token chạy ở hai nơi thì hai nơi giành tin nhắn của nhau. Nếu người dùng đưa token đã dùng cho khách khác thì cảnh báo trước.
 4. **Chỉ báo "xong" khi script in `XONG`.** Lỗi thì báo nguyên văn dòng `LOI:` và cách sửa, không đoán.
 5. Không đụng vào quảng cáo của khách: setup chỉ đọc (`check`, `accounts`), không tạo/bật camp.
-6. **Zalo uid mặc định luôn có:** `407658771750743625` (người vận hành). Script tự thêm vào `ZALO_ALLOWED_USERS`, không bao giờ bỏ. uid của khách thì thêm sau, khi khách nhắn thử (xem "Việc hay gặp").
-7. **Zalo: gửi QR cho người dùng ngay khi script in `ZALO_QR: <file>`** (gửi file ảnh, không mô tả). QR sống ~1–2 phút, bridge tự làm mới; mỗi lần có dòng `ZALO_QR:` mới là QR đã đổi, gửi lại. Người dùng báo "đã quét" nhưng script chưa in `Da quet QR` thì chưa vào: kiểm tra `~/.hermes-zalo/bridge.log` trên VPS, không tin lời báo.
+6. **Zalo: không bao giờ chép uid giữa các VPS.** uid Zalo tương đối theo từng nick: cùng một người, nhìn từ hai nick phụ khác nhau là hai uid khác nhau (đã gặp: người vận hành là `407658771750743625` ở nick này, `1529073626665582316` ở nick khác, nên bot im lặng). Người được nhắn bot thì cho bằng **số điện thoại** (`CUSTOMER_ZALO_PHONES`, script tự tra uid qua chính nick phụ), hoặc lấy uid từ log của **chính VPS đó** bằng `zalo-allow.sh`.
+7. **Zalo: chạy `setup.sh` ở chế độ nền** (Bash `run_in_background`) và đọc output khi có thông báo: mỗi dòng `ZALO_QR: <file>` mới là một QR mới, **gửi file ảnh đó cho người dùng ngay** (SendUserFile). QR ra trước khi cài Hermes, khoảng 1 phút sau khi chạy, và sống ~1–2 phút; bridge tự làm mới và script tự tải lại. Người dùng báo "đã quét" mà output chưa có `ZALO_SCANNED` thì chưa vào: không tin lời báo, xem `~/.hermes-zalo/bridge.log`.
 
 ## Đầu vào cần hỏi (gom một lượt)
 
@@ -44,7 +44,8 @@ Dùng khi người dùng nói "setup hermes cho khách", "cài bot lên VPS", "b
 | `OPENWEBUI_DOMAIN` | không | mặc định `<ip-gạch-ngang>.sslip.io` (vd `151-246-182-155.sslip.io`). Đặt tên miền riêng nếu đã trỏ DNS |
 | `TELEGRAM_QUIET` | không | mặc định `1`: bot Telegram chỉ gửi 1 tin kết quả. `0` để về mặc định của Hermes |
 | `ZALO` | không | `1` = gắn Zalo cá nhân (nick phụ của khách). Mặc định `0` |
-| `CUSTOMER_ZALO_IDS` | không | uid Zalo (số dài, không phải SĐT) của người được nhắn bot, cách nhau dấu phẩy. `407658771750743625` luôn được thêm |
+| `CUSTOMER_ZALO_PHONES` | không | SĐT Zalo của người được nhắn bot (khách, người vận hành), cách nhau dấu phẩy. Script tra uid qua chính nick phụ sau khi đăng nhập. SĐT người vận hành nằm sẵn trong `DEFAULT_ZALO_PHONES` (`scripts/setup.sh`) |
+| `CUSTOMER_ZALO_IDS` | không | uid Zalo, **chỉ** khi lấy từ log của chính VPS này (chạy lại setup). Không chép từ VPS khác |
 | `ZALO_GROUP_MODE` | không | mặc định `mention`: trong nhóm chỉ trả lời khi được @tag / reply. `all` = mọi tin, `off` = chỉ chat riêng |
 
 ## Cách chạy
@@ -77,11 +78,20 @@ Mật khẩu có ký tự `#`, `!`: đặt trong dấu nháy đơn trong file en
 
 Dùng [hermes-zalo-plugin](https://github.com/cuongdev/hermes-zalo-plugin) (zca-js, API Zalo **không chính thức**): bridge Node chạy service `com.hermes.zaloplugin` (systemd user) nghe `127.0.0.1:8787`, Hermes nối vào bằng adapter `zalo-platform`. Plugin chính thức `zalo-platform` trong catalog Hermes là Zalo **Bot** (bot.zaloplatforms.com), không chạy được trên nick cá nhân.
 
-Luồng trong `setup.sh`, sau bước Telegram/Open WebUI:
-1. `zalo.sh prepare`: cài Node 22 + plugin, ghi `ZALO_*` vào `~/.hermes/.env`, cài service bridge (`setup --service-only`), bridge tự ra QR.
-2. Script tải QR về cạnh file env (`<ten-khach>-zalo-qr.png`), in `ZALO_QR: <file>` → **gửi file đó cho người dùng ngay**. QR đổi thì tải lại và in dòng mới.
-3. Người dùng mở Zalo **trên nick phụ** → Quét QR → xác nhận trên điện thoại. Script in `Da quet QR`.
-4. `zalo.sh finish`: restart gateway, chờ log `Zalo: connected`.
+Luồng trong `setup.sh` khi `ZALO=1`:
+1. Ngay sau bước SSH, chạy `zalo.sh prepare`: cài Node 22, plugin và service bridge, rồi bridge tự ra QR. Bước này không cần Hermes nên QR có sau khoảng 1 phút, không phải đợi cài Hermes 5–6 phút.
+2. Một tiến trình nền canh QR: mỗi lần QR đổi thì tải về cạnh file env (`<ten-khach>-zalo-qr.png`) và in `ZALO_QR: <file>`. **Agent gửi file đó cho người dùng ngay.** Trong lúc đó Hermes vẫn cài song song.
+3. Người dùng mở Zalo **trên nick phụ** → Quét QR → xác nhận trên điện thoại. Output in `ZALO_SCANNED`.
+4. Sau khi Hermes cài xong, `zalo.sh finish` làm tiếp:
+   - chép adapter vào `~/.hermes/plugins/zalo`;
+   - tra uid từ `CUSTOMER_ZALO_PHONES`, ghi `ZALO_*`, giữ các uid đã thêm trước đó;
+   - restart gateway và chờ log `Zalo: connected`.
+
+Cách chạy cho agent:
+```
+bash scripts/setup.sh ~/khach/<ten-khach>.env      # Bash run_in_background, theo dõi output
+```
+Thấy `ZALO_QR:` thì gửi file. Thấy `XONG` thì báo kết quả. Thấy `LOI:` thì báo nguyên văn.
 
 Nhắc khách: **đăng xuất Zalo Web/PC của nick phụ trước khi quét và đừng mở lại**, không thì phiên bot bị đá, phải quét lại. Zalo có thể khoá nick tự động hoá, vì vậy chỉ dùng nick phụ.
 
@@ -90,7 +100,7 @@ Không chạy `hermes-zalo-plugin setup` (không cờ) bằng tay: nó chạy `l
 ## Việc hay gặp sau này
 
 - **Thêm/bớt Telegram ID, đổi model, đổi key, thêm skill:** sửa file env của khách rồi chạy lại bước 3. Script ghi đè giá trị cũ, giữ `settings.json` của skill.
-- **Thêm khách Zalo:** nhờ khách nhắn (hoặc @tag nick phụ trong nhóm) một tin, rồi `ssh <vps> 'grep -h "Zalo inbound" ~/.hermes/logs/gateway.log | tail -5'` → lấy `uid=...` (đúng `name=`), thêm vào `CUSTOMER_ZALO_IDS`, chạy lại bước 3. Nhanh: `sed -i 's|^ZALO_ALLOWED_USERS=.*|ZALO_ALLOWED_USERS=<uid1>,<uid2>|' ~/.hermes/.env && systemctl --user restart hermes-gateway`. Tin gửi trước khi được thêm không được xử lý lại, khách phải nhắn lại.
+- **Thêm người được nhắn bot Zalo:** nhờ họ nhắn (hoặc @tag nick phụ trong nhóm) một tin, rồi `bash scripts/zalo-allow.sh ~/khach/<ten-khach>.env` để liệt kê người vừa nhắn (tên, uid, đã được nhắn chưa), rồi `bash scripts/zalo-allow.sh ~/khach/<ten-khach>.env <uid>` để thêm và restart gateway. Plugin bỏ qua người lạ **im lặng**, log không có `Unauthorized`, nên "bot không trả lời" thì việc đầu tiên là chạy lệnh liệt kê. Tin gửi trước khi được thêm không được xử lý lại, người đó phải nhắn lại.
 - **Zalo mất đăng nhập** (`curl -s 127.0.0.1:8787/health` có `loggedIn:false`): chạy lại bước 3 với `ZALO=1`, script tự thử cookie cũ, không được thì gửi QR mới. Lý do rớt: `tail ~/.hermes-zalo/bridge.log`.
 - **Ai đã nhắn bot:** `ssh <vps> 'grep -h "inbound message: platform=telegram" ~/.hermes/logs/gateway.log* | tail -20; grep -h "Blocked unauthorized" ~/.hermes/logs/gateway.log* | tail'`. Người bị chặn trước khi được thêm phải nhắn lại.
 - **Bot nhắn quá nhiều khi đang think:** đã tắt sẵn (`TELEGRAM_QUIET=1`: tắt tin giữa chừng, nhật ký tool, lý luận; tiến độ gom thành 1 bong bóng "⏳ Working" tự xoá khi xong; `SOUL.md` dặn nhắn một lần). Muốn xem lại: `ssh <vps> 'hermes config show | grep -A10 telegram'`. Muốn bật lại tin giữa chừng cho một VPS: `hermes config set display.platforms.telegram.interim_assistant_messages true` rồi `systemctl --user restart hermes-gateway`.
