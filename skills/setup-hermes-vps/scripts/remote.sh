@@ -46,9 +46,12 @@ open(path, "w").write("\n".join(out) + "\n")
 PY
 }
 setenv OPENROUTER_API_KEY "$OPENROUTER_API_KEY"
-setenv TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
-setenv TELEGRAM_ALLOWED_USERS "$ALLOWED_IDS"
-setenv TELEGRAM_HOME_CHANNEL "$HOME_CHANNEL"
+HAS_TG=0; [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && HAS_TG=1   # ZALO=1 thi Telegram khong bat buoc
+if [ "$HAS_TG" = "1" ]; then
+  setenv TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
+  setenv TELEGRAM_ALLOWED_USERS "$ALLOWED_IDS"
+  setenv TELEGRAM_HOME_CHANNEL "$HOME_CHANNEL"
+fi
 [ -n "$ZERNIO_API_KEY" ] && setenv ZERNIO_API_KEY "$ZERNIO_API_KEY"
 
 hermes config set model.provider openrouter >/dev/null
@@ -59,7 +62,7 @@ echo "  Model chat: $CHAT_MODEL | Model anh: $IMAGE_MODEL"
 
 # --- Telegram yen lang: khong nhan tung buoc/suy nghi, chi 1 tin ket qua ---
 # Mac dinh Hermes gui "tin giua chung" + nhat ky tool nen khach thay bot nhan lien tuc khi dang think.
-if [ "${TELEGRAM_QUIET:-1}" = "1" ]; then
+if [ "$HAS_TG" = "1" ] && [ "${TELEGRAM_QUIET:-1}" = "1" ]; then
   for kv in tool_progress=off interim_assistant_messages=false show_reasoning=false busy_ack_detail=false \
             suppress_warning_notifications=true cleanup_progress=true long_running_notifications=true; do
     hermes config set "display.platforms.telegram.${kv%%=*}" "${kv#*=}" >/dev/null
@@ -125,10 +128,13 @@ LOG="$HOME/.hermes/logs/gateway.log"; MARK=$(wc -l 2>/dev/null <"$LOG" || echo 0
 systemctl --user restart hermes-gateway
 for _ in $(seq 1 30); do
   sleep 2
+  [ "$HAS_TG" = "1" ] || { sleep 8; break; }
   tail -n +"$((MARK+1))" "$LOG" 2>/dev/null | grep -q "telegram connected" && break
 done
 systemctl --user is-active --quiet hermes-gateway || { systemctl --user status hermes-gateway --no-pager | head; echo "LOI: gateway khong chay"; exit 1; }
-if tail -n +"$((MARK+1))" "$LOG" | grep -q "telegram connected"; then
+if [ "$HAS_TG" = "0" ]; then
+  echo "  Gateway: chay nen (systemd, song sau reboot/logout), khong co Telegram"
+elif tail -n +"$((MARK+1))" "$LOG" | grep -q "telegram connected"; then
   echo "  Gateway: chay nen (systemd, song sau reboot/logout), Telegram da ket noi"
 else
   tail -n +"$((MARK+1))" "$LOG" | grep -iE "error|conflict|telegram" | tail -8
