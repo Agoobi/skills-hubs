@@ -1,7 +1,7 @@
 ---
 name: setup-hermes-vps
 description: Cài Hermes lên VPS khách: Telegram (yên lặng) và/hoặc Zalo cá nhân (nick phụ, quét QR), OpenRouter, Zernio, Open WebUI.
-version: 0.3.1
+version: 0.3.2
 author: Agoobi
 license: MIT
 metadata:
