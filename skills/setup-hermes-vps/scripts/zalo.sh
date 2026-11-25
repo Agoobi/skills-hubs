@@ -14,7 +14,8 @@ U="$HOME/.config/systemd/user/com.hermes.zaloplugin.service"
 PLUGIN_VER="${ZALO_PLUGIN_VERSION:-1.0.12}"
 health() { curl -fsS --max-time 3 http://127.0.0.1:8787/health 2>/dev/null || true; }
 # Ghi log bridge ra file (biet ly do khi phien rot). --service-only viet lai unit nen goi lai sau moi lan.
-unit_log() { grep -q StandardOutput "$U" || sed -i "/^RestartSec=/a StandardOutput=append:$ZDIR/bridge.log\nStandardError=append:$ZDIR/bridge.log" "$U"; systemctl --user daemon-reload; }
+# mkdir truoc: VPS moi chua co ~/.hermes-zalo, systemd khong mo duoc file log -> bridge chet (209/STDOUT).
+unit_log() { mkdir -p "$ZDIR"; grep -q StandardOutput "$U" || sed -i "/^RestartSec=/a StandardOutput=append:$ZDIR/bridge.log\nStandardError=append:$ZDIR/bridge.log" "$U"; systemctl --user daemon-reload; }
 
 case "${ZALO_STAGE:-prepare}" in
 prepare)
